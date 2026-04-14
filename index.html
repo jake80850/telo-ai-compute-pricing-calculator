@@ -289,7 +289,7 @@ textarea::placeholder{color:var(--text3);}
       <div class="fg" style="grid-column:1/-1;"><label>Build Name</label><input type="text" id="nb-name" placeholder="e.g. 3090 Ti Budget Build"></div>
       <div class="fg"><label>Starting GPU</label><select id="nb-gpu"></select></div>
       <div class="fg"><label>Number of GPUs</label><input type="number" id="nb-ngpu" value="2" min="1" max="8"></div>
-      <div class="fg"><label>Est. Vast rate ($/hr)</label><input type="number" id="nb-rate" step="0.05" placeholder="0.75"></div>
+      <div class="fg"><label>Est. Vast rate (¢/hr)</label><input type="number" id="nb-rate" step="1" placeholder="75"></div>
       <div class="fg"><label>Utilization %</label><input type="number" id="nb-util" value="70" min="10" max="100"></div>
       <div class="fg" style="grid-column:1/-1;"><label>Electricity ($/kWh)</label><input type="number" id="nb-kwh" step="0.01" placeholder="0.12"></div>
     </div>
@@ -314,7 +314,7 @@ textarea::placeholder{color:var(--text3);}
       <div class="fg"><label>Price / card ($)</label><input type="number" id="gf-price" placeholder="3999"></div>
       <div class="fg"><label>VRAM (GB)</label><input type="number" id="gf-vram" placeholder="32"></div>
       <div class="fg"><label>TDP (Watts)</label><input type="number" id="gf-tdp" placeholder="575"></div>
-      <div class="fg"><label>Est. Vast rate ($/hr)</label><input type="number" id="gf-rate" step="0.05" placeholder="1.30"></div>
+      <div class="fg"><label>Est. Vast rate (¢/hr)</label><input type="number" id="gf-rate" step="1" placeholder="130"></div>
       <div class="fg"><label>Generation</label><input type="text" id="gf-gen" placeholder="e.g. Blackwell"></div>
       <div class="fg"><label>Badge</label>
         <select id="gf-badge">
@@ -625,13 +625,13 @@ function renderDash(){
   renderDashMetrics();
 
   document.getElementById('dash-sliders').innerHTML=
-    sHtml('d-rate','Price / GPU / hr',0.05,3.00,0.05,b.rate,col,'$',2)+
+    sHtml('d-rate','Price / GPU / hr',5,300,1,Math.round(b.rate*100),col,'','0','¢')+
     sHtml('d-util','Utilization %',10,100,5,b.util,col,'','0','%')+
     sHtml('d-kwh','Electricity $/kWh',0.00,0.70,0.01,b.kwh,col,'$',2)+
     sHtml('d-ngpu','Number of GPUs',1,8,1,b.numGpu,col,'','0');
 
   const bid=dashBid;
-  document.getElementById('d-rate').oninput=ev=>{buildById(bid).rate=parseFloat(ev.target.value);document.getElementById('d-rate-out').textContent='$'+parseFloat(ev.target.value).toFixed(2);renderDashMetrics();};
+  document.getElementById('d-rate').oninput=ev=>{buildById(bid).rate=parseFloat(ev.target.value)/100;document.getElementById('d-rate-out').textContent=Math.round(parseFloat(ev.target.value))+'¢';renderDashMetrics();};
   document.getElementById('d-rate').onchange=ev=>{persist();updateAll();};
   document.getElementById('d-util').oninput=ev=>{buildById(bid).util=parseInt(ev.target.value);document.getElementById('d-util-out').textContent=parseInt(ev.target.value)+'%';renderDashMetrics();};
   document.getElementById('d-util').onchange=ev=>{persist();updateAll();};
@@ -681,7 +681,7 @@ function createBuild(){
   const name=document.getElementById('nb-name').value.trim()||'New Build';
   const gpuId=document.getElementById('nb-gpu').value;
   const g=gpuById(gpuId);
-  const rate=parseFloat(document.getElementById('nb-rate').value)||g.rate;
+  const rate=(parseFloat(document.getElementById('nb-rate').value)||g.rate*100)/100;
   const util=parseInt(document.getElementById('nb-util').value)||70;
   const kwh=parseFloat(document.getElementById('nb-kwh').value)||0.12;
   const numGpu=parseInt(document.getElementById('nb-ngpu').value)||2;
@@ -839,13 +839,13 @@ function openEditGPU(id){
   document.getElementById('gmodal-title').textContent='Edit GPU';
   document.getElementById('gf-name').value=g.name;document.getElementById('gf-price').value=g.price;
   document.getElementById('gf-vram').value=g.vram;document.getElementById('gf-tdp').value=g.tdp;
-  document.getElementById('gf-rate').value=g.rate;document.getElementById('gf-gen').value=g.gen;
+  document.getElementById('gf-rate').value=Math.round(g.rate*100);document.getElementById('gf-gen').value=g.gen;
   document.getElementById('gf-badge').value=g.badge;
   document.getElementById('gmodal').classList.add('open');
 }
 function saveGPU(){
   const name=document.getElementById('gf-name').value.trim();if(!name)return;
-  const data={name,price:parseFloat(document.getElementById('gf-price').value)||0,vram:parseInt(document.getElementById('gf-vram').value)||0,tdp:parseInt(document.getElementById('gf-tdp').value)||300,rate:parseFloat(document.getElementById('gf-rate').value)||0.50,gen:document.getElementById('gf-gen').value.trim()||'Unknown',badge:document.getElementById('gf-badge').value};
+  const data={name,price:parseFloat(document.getElementById('gf-price').value)||0,vram:parseInt(document.getElementById('gf-vram').value)||0,tdp:parseInt(document.getElementById('gf-tdp').value)||300,rate:(parseFloat(document.getElementById('gf-rate').value)||50)/100,gen:document.getElementById('gf-gen').value.trim()||'Unknown',badge:document.getElementById('gf-badge').value};
   if(editGid){Object.assign(S.gpus.find(g=>g.id===editGid),data);}
   else{S.gpus.push({id:'g'+Date.now(),...data});}
   persist();closeGM();updateAll();
