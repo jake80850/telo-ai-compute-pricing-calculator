@@ -907,7 +907,26 @@ function importJSON() {
     r.onload = ev => {
       try {
         const data = JSON.parse(ev.target.result);
-        if (data.gpus && data.parts) { state = data; save(); updateAll(); }
+        // App's own export format
+        if (data.gpus && data.parts) {
+          state = data; save(); updateAll(); return;
+        }
+        // External format: { builds: [{ parts: [{ category, part, unit }] }] }
+        if (data.builds && Array.isArray(data.builds) && data.builds.length > 0) {
+          const src = data.builds[0];
+          if (Array.isArray(src.parts)) {
+            state.parts = src.parts.map((p, i) => ({
+              id: 'p' + Date.now() + i,
+              cat: p.category || p.cat || 'Misc',
+              name: p.part || p.name || 'Unknown Part',
+              notes: p.notes || '',
+              qty: p.qty || 1,
+              price: p.unit || p.price || 0
+            }));
+          }
+          save(); updateAll(); return;
+        }
+        alert('Unrecognized JSON format.');
       } catch(err) { alert('Invalid JSON file.'); }
     };
     r.readAsText(f);
