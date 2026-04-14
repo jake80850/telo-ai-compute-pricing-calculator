@@ -508,7 +508,7 @@ function showTab(id){
 function buildCost(bid){return buildById(bid).parts.reduce((s,p)=>s+p.qty*p.price,0);}
 function calc(bid){
   const b=buildById(bid), g=gpuById(b.gpuId);
-  const gross=b.numGpu*b.rate*(b.util/100)*0.92;
+  const gross=b.numGpu*b.rate*(b.util/100);
   const kw=(b.numGpu*g.tdp+100)/1000;
   const pcost=kw*b.kwh;
   const net=gross-pcost;
@@ -991,7 +991,7 @@ function renderEarnings(){
 
 function calcAt(bid,rate){
   const b=buildById(bid),g=gpuById(b.gpuId);
-  return(b.numGpu*rate*(b.util/100)*0.92-(b.numGpu*g.tdp+100)/1000*b.kwh)*24*30;
+  return(b.numGpu*rate*(b.util/100)-(b.numGpu*g.tdp+100)/1000*b.kwh)*24*30;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
