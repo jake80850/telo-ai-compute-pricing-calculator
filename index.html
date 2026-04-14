@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Rig Builder — Vast.ai Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#0a0c0f;--bg2:#111318;--bg3:#181c22;--bg4:#1e2330;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8eaf0;--text2:#8b92a8;--text3:#555e75;
+  --cyan:#00d4aa;--blue:#0099ff;--orange:#ff6b35;
+  --danger:#ff4757;--warning:#ffb800;--purple:#8b5cf6;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --r:6px;--r2:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;min-height:100vh;}
+
+/* TOPBAR */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--cyan);letter-spacing:.08em;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:7px;height:7px;background:var(--cyan);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+#tb-builds{display:flex;gap:16px;align-items:center;overflow:hidden;}
+.tb-item{font-family:var(--mono);font-size:11px;color:var(--text2);white-space:nowrap;}
+.tb-item b{font-weight:600;}
+
+/* LAYOUT */
+.container{max-width:1440px;margin:0 auto;padding:24px 20px;}
+.tabs{display:flex;gap:2px;margin-bottom:24px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:4px;width:fit-content;flex-wrap:wrap;}
+.tab{padding:6px 18px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);border:none;background:none;transition:all .15s;font-family:var(--sans);}
+.tab.active{background:var(--bg4);color:var(--text);border:1px solid var(--border2);}
+.tab:hover:not(.active){color:var(--text);}
+.panel{display:none;}.panel.active{display:block;}
+
+/* PILL BAR */
+.pill-bar{display:flex;gap:6px;margin-bottom:20px;align-items:center;flex-wrap:wrap;}
+.pill{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text2);transition:all .15s;font-family:var(--sans);white-space:nowrap;}
+.pill.active{border-color:var(--border2);color:var(--text);background:var(--bg4);}
+.pill:hover:not(.active){color:var(--text);}
+.pill-new{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px dashed rgba(139,92,246,.5);background:rgba(139,92,246,.07);color:var(--purple);transition:all .15s;font-family:var(--sans);}
+.pill-new:hover{background:rgba(139,92,246,.15);border-color:var(--purple);}
+
+/* GRIDS */
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:20px;}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:18px;}
+.card-title{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;margin-bottom:12px;}
+
+/* METRICS */
+.mv{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1;margin-bottom:4px;}
+.mv-cyan{color:var(--cyan);}.mv-blue{color:var(--blue);}.mv-orange{color:var(--orange);}.mv-purple{color:var(--purple);}
+.metric-sub{font-size:11px;color:var(--text3);}
+
+/* TABLE */
+.dt{width:100%;border-collapse:collapse;}
+.dt th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;padding:0 10px 10px 0;border-bottom:1px solid var(--border);}
+.dt td{padding:9px 10px 9px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);vertical-align:middle;}
+.dt tr:last-child td{border-bottom:none;}
+.dt .tr-tot td{font-weight:600;font-family:var(--mono);border-top:1px solid var(--border2);border-bottom:none;padding-top:12px;}
+.pc{font-family:var(--mono);text-align:right;white-space:nowrap;}
+
+/* BADGES */
+.badge{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;letter-spacing:.05em;}
+.bc{background:rgba(0,212,170,.12);color:var(--cyan);border:1px solid rgba(0,212,170,.25);}
+.bb{background:rgba(0,153,255,.12);color:var(--blue);border:1px solid rgba(0,153,255,.25);}
+.bo{background:rgba(255,107,53,.12);color:var(--orange);border:1px solid rgba(255,107,53,.25);}
+.bp{background:rgba(139,92,246,.12);color:var(--purple);border:1px solid rgba(139,92,246,.25);}
+.bg-badge{background:rgba(255,255,255,.05);color:var(--text2);border:1px solid var(--border);}
+
+/* SLIDERS */
+.srow{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.slabel{font-size:12px;color:var(--text2);width:148px;flex-shrink:0;}
+.sval{font-family:var(--mono);font-size:12px;font-weight:600;min-width:60px;text-align:right;color:var(--cyan);}
+input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:4px;background:var(--bg4);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;background:var(--cyan);border-radius:50%;cursor:pointer;border:2px solid var(--bg);}
+
+/* FORM */
+input[type=text],input[type=number],select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;padding:8px 11px;outline:none;transition:border-color .15s;width:100%;}
+input[type=text]:focus,input[type=number]:focus,select:focus,textarea:focus{border-color:var(--cyan);}
+select option{background:var(--bg2);}
+textarea{resize:vertical;min-height:78px;line-height:1.6;}
+textarea::placeholder{color:var(--text3);}
+.fg label{display:block;font-size:10px;color:var(--text3);margin-bottom:5px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-bottom:14px;}
+
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;}
+.btn-primary{background:var(--cyan);color:var(--bg);}
+.btn-primary:hover{opacity:.85;}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(255,71,87,.3);}
+.btn-danger:hover{background:rgba(255,71,87,.1);}
+.btn-purple{background:var(--purple);color:#fff;}
+.btn-purple:hover{opacity:.85;}
+.btn-sm{padding:5px 9px;font-size:12px;}
+
+/* BAR CHART */
+.bar-chart{display:flex;flex-direction:column;gap:8px;}
+.brow{display:flex;align-items:center;gap:9px;}
+.blabel{font-size:11px;color:var(--text2);width:82px;flex-shrink:0;text-align:right;line-height:1.3;}
+.btrack{flex:1;background:var(--bg3);border-radius:2px;height:7px;overflow:hidden;}
+.bfill{height:100%;border-radius:2px;transition:width .35s ease;}
+.bval{font-family:var(--mono);font-size:11px;color:var(--text2);width:80px;}
+
+/* COMPARE */
+.cmp-table{width:100%;border-collapse:collapse;}
+.cmp-table th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;padding:0 0 12px;border-bottom:1px solid var(--border);}
+.cmp-table th:not(:first-child){text-align:right;}
+.cmp-table td{padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.cmp-table td:not(:first-child){text-align:right;font-family:var(--mono);}
+.cmp-table tr:last-child td{border-bottom:none;}
+.wbadge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:4px;font-family:var(--mono);}
+
+.win-strip{display:flex;align-items:center;justify-content:center;padding:12px;border-radius:var(--r);margin-bottom:18px;font-size:13px;font-weight:500;border:1px solid var(--border);color:var(--text2);background:rgba(255,255,255,.03);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:26px;width:500px;max-width:93vw;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:18px;}
+.modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:18px;}
+
+/* MISC */
+.tag{display:inline-flex;align-items:center;font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:2px 6px;}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.sec-hdr h2{font-size:15px;font-weight:600;}
+.tl-item{position:relative;padding:0 0 16px 18px;border-left:1px solid var(--border);}
+.tl-item:last-child{border-left:1px solid transparent;padding-bottom:0;}
+.tl-dot{position:absolute;left:-5px;top:3px;width:9px;height:9px;border-radius:50%;border:2px solid var(--bg2);}
+.tl-date{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:2px;}
+.tl-event{font-size:12px;color:var(--text);}
+.tl-amt{font-family:var(--mono);font-size:11px;margin-top:1px;}
+
+/* SNAPSHOTS */
+.snap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-top:18px;}
+.snap-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:18px;position:relative;transition:border-color .15s;}
+.snap-card:hover{border-color:var(--border2);}
+.snap-name{font-size:14px;font-weight:600;margin-bottom:3px;padding-right:80px;}
+.snap-build-tag{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;margin-bottom:11px;}
+.snap-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.snap-stat{background:var(--bg3);border-radius:var(--r);padding:7px 9px;}
+.snap-stat-label{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;}
+.snap-stat-val{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);}
+.snap-usecase{border-top:1px solid var(--border);padding-top:10px;margin-top:2px;}
+.snap-usecase-label{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;}
+.snap-usecase-text{font-size:12px;color:var(--text2);line-height:1.7;font-style:italic;}
+.snap-date{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:9px;}
+.snap-actions{position:absolute;top:14px;right:14px;display:flex;gap:4px;}
+.snap-empty{text-align:center;padding:50px 20px;color:var(--text3);}
+
+/* NEW BUILD MODAL colors */
+.color-swatch{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s;flex-shrink:0;}
+.color-swatch.selected{border-color:var(--text);}
+
+@media(max-width:768px){.g3{grid-template-columns:1fr;}.g2{grid-template-columns:1fr;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-dot"></div>AI RIG BUILDER</div>
+  <div id="tb-builds"></div>
+</div>
+
+<div id="db-loader" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #333;border-top-color:#00d4aa;border-radius:50%;animation:spin .7s linear infinite;"></div>
+  <div style="color:#aaa;font-size:13px;font-family:var(--mono);">Loading from database…</div>
+</div>
+
+<div class="container">
+  <div class="tabs" id="main-tabs">
+    <button class="tab active" onclick="showTab('dashboard')">Dashboard</button>
+    <button class="tab" onclick="showTab('parts')">Parts Lists</button>
+    <button class="tab" onclick="showTab('gpus')">GPU Manager</button>
+    <button class="tab" onclick="showTab('compare')">Compare</button>
+    <button class="tab" onclick="showTab('earnings')">Earnings</button>
+    <button class="tab" onclick="showTab('snapshots')">Snapshots <span id="snap-count-badge" style="font-family:var(--mono);font-size:10px;background:rgba(139,92,246,.2);color:var(--purple);border-radius:3px;padding:1px 5px;margin-left:2px;"></span></button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="panel active" id="tab-dashboard">
+    <div class="pill-bar" id="dash-pills"></div>
+    <div class="g3" id="dash-metrics"></div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-title">Active GPU — <span id="dash-build-name"></span></div>
+        <div id="dash-gpu-info" style="margin-bottom:14px;"></div>
+        <div id="dash-sliders"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Revenue Breakdown</div>
+        <div class="bar-chart" id="rev-chart"></div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:14px 0;">
+        <div class="card-title">ROI Timeline</div>
+        <div id="roi-tl"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTS LISTS -->
+  <div class="panel" id="tab-parts">
+    <div class="pill-bar" id="parts-pills"></div>
+    <div id="parts-content"></div>
+  </div>
+
+  <!-- GPU MANAGER -->
+  <div class="panel" id="tab-gpus">
+    <div class="sec-hdr"><h2>GPU Library</h2><button class="btn btn-primary btn-sm" onclick="openAddGPU()">+ Add GPU</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:18px;" id="gpu-cards"></div>
+    <div class="card"><div class="card-title">GPU Comparison</div><div class="bar-chart" id="gpu-cmp"></div></div>
+  </div>
+
+  <!-- COMPARE -->
+  <div class="panel" id="tab-compare">
+    <div style="display:flex;gap:10px;margin-bottom:18px;align-items:center;flex-wrap:wrap;">
+      <div class="fg" style="min-width:180px;"><label>Build A</label><select id="cmp-sel-a" onchange="updateAll()"></select></div>
+      <div style="font-size:20px;color:var(--text3);padding-top:18px;">vs</div>
+      <div class="fg" style="min-width:180px;"><label>Build B</label><select id="cmp-sel-b" onchange="updateAll()"></select></div>
+    </div>
+    <div id="cmp-strip"></div>
+    <div class="g3" id="cmp-head"></div>
+    <div class="g2" style="margin-bottom:18px;">
+      <div class="card"><div class="card-title">Build Cost Breakdown</div><div class="bar-chart" id="cmp-cost"></div></div>
+      <div class="card"><div class="card-title">Earnings Side-by-Side</div><div class="bar-chart" id="cmp-earn"></div></div>
+    </div>
+    <div class="card" style="margin-bottom:18px;"><div class="card-title">Full Specification Comparison</div><table class="cmp-table" id="cmp-spec"></table></div>
+    <div class="card"><div class="card-title">Parts Diff — What Changed</div><table class="dt" id="parts-diff"></table></div>
+  </div>
+
+  <!-- EARNINGS -->
+  <div class="panel" id="tab-earnings">
+    <div class="g3" id="earn-metrics"></div>
+    <div class="g2">
+      <div class="card"><div class="card-title">Monthly Profit by Rate — All Builds</div><div class="bar-chart" id="rate-chart"></div></div>
+      <div class="card"><div class="card-title">Break-even Analysis</div><div id="be-detail"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">Vast.ai Notes</div>
+      <p style="font-size:13px;color:var(--text2);line-height:1.9;">
+        Vast.ai charges an <strong style="color:var(--text)">~8% platform fee</strong> already factored into all calculations.
+        Requires a reliable <strong style="color:var(--text)">1Gbps+ connection</strong> — ideally 10GbE.
+        Run <strong style="color:var(--text)">Ubuntu 22.04</strong> with their Docker setup.
+        The <strong style="color:var(--text)">32GB+ VRAM</strong> threshold unlocks 70B+ LLM workloads at premium rates.
+        New machines take a few weeks to build rental history before hitting full utilization.
+      </p>
+    </div>
+  </div>
+
+  <!-- SNAPSHOTS -->
+  <div class="panel" id="tab-snapshots">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">Save current settings as a snapshot</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div class="fgrid">
+            <div class="fg"><label>Snapshot name</label><input type="text" id="sn-name" placeholder="e.g. San Carlos — PG&E Tier 2"></div>
+            <div class="fg"><label>Which build</label><select id="sn-build"></select></div>
+          </div>
+          <div class="fg" style="margin-bottom:11px;">
+            <label>Use case / life context</label>
+            <textarea id="sn-note" placeholder="e.g. Running from my garage in San Carlos on PG&E Tier 2 ($0.41/kWh). Goal is to offset mortgage by ~$400/mo. Rig runs 24/7 while I'm at work — started to fund kids' college savings, aiming for break-even before next summer."></textarea>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveSnapshot()">&#9654; Save Snapshot</button>
+        </div>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:13px 15px;min-width:185px;font-size:12px;color:var(--text2);line-height:2;align-self:flex-start;">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px;">Captures automatically</div>
+          GPU · rate · utilization · electricity<br>Monthly profit · break-even · build cost<br>Parts count · timestamp
+        </div>
+      </div>
+    </div>
+    <div id="snap-list"></div>
+  </div>
+</div>
+
+<!-- NEW BUILD MODAL -->
+<div class="modal-overlay" id="nbmodal">
+  <div class="modal">
+    <div class="modal-title">Create New Build</div>
+    <div class="fgrid">
+      <div class="fg" style="grid-column:1/-1;"><label>Build Name</label><input type="text" id="nb-name" placeholder="e.g. 3090 Ti Budget Build"></div>
+      <div class="fg"><label>Starting GPU</label><select id="nb-gpu"></select></div>
+      <div class="fg"><label>Number of GPUs</label><input type="number" id="nb-ngpu" value="2" min="1" max="8"></div>
+      <div class="fg"><label>Est. Vast rate ($/hr)</label><input type="number" id="nb-rate" step="0.05" placeholder="0.75"></div>
+      <div class="fg"><label>Utilization %</label><input type="number" id="nb-util" value="70" min="10" max="100"></div>
+      <div class="fg" style="grid-column:1/-1;"><label>Electricity ($/kWh)</label><input type="number" id="nb-kwh" step="0.01" placeholder="0.12"></div>
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Build color</label>
+      <div id="nb-colors" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;"></div>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:4px;">Starts with an empty parts list — add parts in the Parts Lists tab.</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeNB()">Cancel</button>
+      <button class="btn btn-purple" onclick="createBuild()">Create Build</button>
+    </div>
+  </div>
+</div>
+
+<!-- GPU MODAL -->
+<div class="modal-overlay" id="gmodal">
+  <div class="modal">
+    <div class="modal-title" id="gmodal-title">Add GPU</div>
+    <div class="fgrid">
+      <div class="fg" style="grid-column:1/-1;"><label>GPU Name</label><input type="text" id="gf-name" placeholder="e.g. RTX 5090"></div>
+      <div class="fg"><label>Price / card ($)</label><input type="number" id="gf-price" placeholder="3999"></div>
+      <div class="fg"><label>VRAM (GB)</label><input type="number" id="gf-vram" placeholder="32"></div>
+      <div class="fg"><label>TDP (Watts)</label><input type="number" id="gf-tdp" placeholder="575"></div>
+      <div class="fg"><label>Est. Vast rate ($/hr)</label><input type="number" id="gf-rate" step="0.05" placeholder="1.30"></div>
+      <div class="fg"><label>Generation</label><input type="text" id="gf-gen" placeholder="e.g. Blackwell"></div>
+      <div class="fg"><label>Badge</label>
+        <select id="gf-badge">
+          <option value="bc">Cyan — flagship</option><option value="bb">Blue — mainstream</option>
+          <option value="bo">Orange — budget</option><option value="bp">Purple — workstation</option><option value="bg-badge">Gray — other</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeGM()">Cancel</button><button class="btn btn-primary" onclick="saveGPU()">Save GPU</button></div>
+  </div>
+</div>
+
+<!-- PART MODAL -->
+<div class="modal-overlay" id="pmodal">
+  <div class="modal">
+    <div class="modal-title" id="pmodal-title">Add Part</div>
+    <div class="fgrid">
+      <div class="fg"><label>Category</label><input type="text" id="pf-cat" placeholder="GPU, CPU, RAM…"></div>
+      <div class="fg"><label>Part Name</label><input type="text" id="pf-name" placeholder="e.g. RTX 4090 24GB"></div>
+      <div class="fg" style="grid-column:1/-1;"><label>Notes</label><input type="text" id="pf-notes" placeholder="optional"></div>
+      <div class="fg"><label>Quantity</label><input type="number" id="pf-qty" value="1" min="1"></div>
+      <div class="fg"><label>Unit Price ($)</label><input type="number" id="pf-price" placeholder="0"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closePM()">Cancel</button><button class="btn btn-primary" id="psave-btn" onclick="savePart()">Save Part</button></div>
+  </div>
+</div>
+
+<!-- SNAPSHOT EDIT MODAL -->
+<div class="modal-overlay" id="sneditmodal">
+  <div class="modal" style="width:460px;">
+    <div class="modal-title">Edit Snapshot</div>
+    <div class="fgrid">
+      <div class="fg" style="grid-column:1/-1;"><label>Name</label><input type="text" id="sne-name" placeholder="Snapshot name"></div>
+      <div class="fg" style="grid-column:1/-1;"><label>Notes <span style="color:var(--text3);font-weight:400;">(optional)</span></label><textarea id="sne-note" style="width:100%;min-height:80px;resize:vertical;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:8px 10px;font-size:13px;" placeholder="e.g. context, goals, setup details…"></textarea></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeSNE()">Cancel</button><button class="btn btn-primary" onclick="saveSNE()">Save</button></div>
+  </div>
+</div>
+
+<!-- RENAME BUILD MODAL -->
+<div class="modal-overlay" id="rnmodal">
+  <div class="modal" style="width:380px;">
+    <div class="modal-title">Rename Build</div>
+    <div class="fg" style="margin-bottom:4px;"><label>Build name</label><input type="text" id="rn-name" placeholder="Build name"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeRN()">Cancel</button><button class="btn btn-primary" onclick="doRename()">Rename</button></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// PALETTE — colors available for builds
+// ─────────────────────────────────────────────────────────────────────────────
+const PALETTE=[
+  {id:'cyan',  hex:'#00d4aa', label:'Cyan'},
+  {id:'blue',  hex:'#0099ff', label:'Blue'},
+  {id:'purple',hex:'#8b5cf6', label:'Purple'},
+  {id:'orange',hex:'#ff6b35', label:'Orange'},
+  {id:'pink',  hex:'#ec4899', label:'Pink'},
+  {id:'yellow',hex:'#f59e0b', label:'Yellow'},
+  {id:'lime',  hex:'#84cc16', label:'Lime'},
+  {id:'red',   hex:'#ff4757', label:'Red'},
+];
+function pc(id){return PALETTE.find(p=>p.id===id)||PALETTE[0];}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const SK='airig_v5';
+const SUPABASE_URL='https://dakpogmusztndffikuzi.supabase.co';
+const SUPABASE_KEY='sb_publishable_BiDb2RmlGYluG6HXjHgoKw_M6x-6k_O';
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const STATE_ID='main';
+
+function freshParts(prefix){return[
+  {id:prefix+'1',cat:'GPU',name:'— add GPU from GPU Manager —',notes:'',qty:1,price:0},
+  {id:prefix+'2',cat:'CPU',name:'AMD Ryzen Threadripper 7960X',notes:'24-core',qty:1,price:1400},
+  {id:prefix+'3',cat:'Motherboard',name:'ASUS Pro WS TRX50-SAGE WiFi',notes:'',qty:1,price:800},
+  {id:prefix+'4',cat:'RAM',name:'128GB DDR5-5600',notes:'',qty:1,price:420},
+  {id:prefix+'5',cat:'Storage',name:'2TB Samsung 990 Pro NVMe',notes:'',qty:1,price:160},
+  {id:prefix+'6',cat:'PSU',name:'Corsair AX1600i 1600W',notes:'',qty:1,price:380},
+  {id:prefix+'7',cat:'Case',name:'Fractal Define 7 XL',notes:'',qty:1,price:200},
+  {id:prefix+'8',cat:'Cooling',name:'Noctua NH-U14S TR5-SP6',notes:'',qty:1,price:180},
+  {id:prefix+'9',cat:'Networking',name:'Intel X550-T1 10GbE NIC',notes:'Required for Vast.ai',qty:1,price:120},
+  {id:prefix+'10',cat:'Misc',name:'Risers, cables, thermal paste',notes:'',qty:1,price:80},
+];}
+
+const DEF={
+  snapshots:[],
+  gpus:[
+    {id:'g1',name:'RTX 4090',price:1900,vram:24,tdp:700,rate:0.75,gen:'Ada Lovelace',badge:'bb'},
+    {id:'g2',name:'RTX 5090',price:3999,vram:32,tdp:575,rate:1.30,gen:'Blackwell',badge:'bc'},
+    {id:'g3',name:'RTX 4080 Super',price:999,vram:16,tdp:320,rate:0.45,gen:'Ada Lovelace',badge:'bo'},
+    {id:'g4',name:'A100 80GB',price:9999,vram:80,tdp:400,rate:2.80,gen:'Ampere Pro',badge:'bp'},
+  ],
+  builds:[
+    {id:'ba',color:'cyan', name:'4090 Build',gpuId:'g1',numGpu:2,rate:0.75,util:70,kwh:0.12,parts:[
+      {id:'pa1',cat:'GPU (×2)',name:'2× NVIDIA RTX 4090 24GB',notes:'Top Vast.ai demand',qty:1,price:3800},
+      {id:'pa2',cat:'CPU',name:'AMD Ryzen Threadripper 7960X',notes:'24-core, PCIe lanes for dual GPU',qty:1,price:1400},
+      {id:'pa3',cat:'Motherboard',name:'ASUS Pro WS TRX50-SAGE WiFi',notes:'TRX50, dual x16 slots',qty:1,price:800},
+      {id:'pa4',cat:'RAM',name:'128GB DDR5-5600 (4× 32GB)',notes:'ECC, dual channel',qty:1,price:420},
+      {id:'pa5',cat:'Storage (OS)',name:'2TB Samsung 990 Pro NVMe',notes:'Fast model loading',qty:1,price:160},
+      {id:'pa6',cat:'Storage (Data)',name:'4TB WD Black SN850X NVMe',notes:'Dataset scratch',qty:1,price:260},
+      {id:'pa7',cat:'PSU',name:'Corsair AX1600i 1600W Titanium',notes:'Dual 4090 ≈ 1400W load',qty:1,price:380},
+      {id:'pa8',cat:'Case',name:'Fractal Design Define 7 XL',notes:'Full tower, airflow',qty:1,price:200},
+      {id:'pa9',cat:'Cooling',name:'Noctua NH-U14S TR5-SP6 + 4× 140mm fans',notes:'',qty:1,price:180},
+      {id:'pa10',cat:'Networking',name:'Intel X550-T1 10GbE NIC',notes:'Required for Vast.ai',qty:1,price:120},
+      {id:'pa11',cat:'Misc',name:'GPU riser, thermal paste, cables',notes:'',qty:1,price:80},
+    ]},
+    {id:'bb',color:'blue', name:'5090 Build',gpuId:'g2',numGpu:2,rate:1.30,util:70,kwh:0.12,parts:[
+      {id:'pb1',cat:'GPU (×2)',name:'2× NVIDIA RTX 5090 32GB',notes:'~2× 4090 perf, 32GB VRAM',qty:1,price:7998},
+      {id:'pb2',cat:'CPU',name:'AMD Ryzen Threadripper 7960X',notes:'24-core, PCIe lanes for dual GPU',qty:1,price:1400},
+      {id:'pb3',cat:'Motherboard',name:'ASUS Pro WS TRX50-SAGE WiFi',notes:'TRX50, dual x16 slots',qty:1,price:800},
+      {id:'pb4',cat:'RAM',name:'128GB DDR5-5600 (4× 32GB)',notes:'ECC, dual channel',qty:1,price:420},
+      {id:'pb5',cat:'Storage (OS)',name:'2TB Samsung 990 Pro NVMe',notes:'Fast model loading',qty:1,price:160},
+      {id:'pb6',cat:'Storage (Data)',name:'4TB WD Black SN850X NVMe',notes:'Dataset scratch',qty:1,price:260},
+      {id:'pb7',cat:'PSU',name:'Corsair AX1600i 1600W Titanium',notes:'5090 ≈ 575W TDP each',qty:1,price:380},
+      {id:'pb8',cat:'Case',name:'Fractal Design Define 7 XL',notes:'Full tower, airflow',qty:1,price:200},
+      {id:'pb9',cat:'Cooling',name:'Noctua NH-U14S TR5-SP6 + 4× 140mm fans',notes:'',qty:1,price:180},
+      {id:'pb10',cat:'Networking',name:'Intel X550-T1 10GbE NIC',notes:'Required for Vast.ai',qty:1,price:120},
+      {id:'pb11',cat:'Misc',name:'GPU riser, thermal paste, cables',notes:'',qty:1,price:80},
+    ]},
+  ]
+};
+
+let S=JSON.parse(JSON.stringify(DEF));
+let dashBid=S.builds[0].id;
+let partsBid=S.builds[0].id;
+let editGid=null, editPid=null, editPbid=null, renameBid=null;
+let nbColor='purple';
+
+async function loadFromDB(){
+  try{
+    const{data}=await db.from('dashboard_state').select('state').eq('id',STATE_ID).single();
+    if(data&&data.state){
+      const d=data.state;
+      if(!d.snapshots)d.snapshots=[];
+      if(!Array.isArray(d.builds))d.builds=Object.values(d.builds);
+      return d;
+    }
+  }catch(e){}
+  // fall back to localStorage if Supabase unreachable
+  try{
+    const s=localStorage.getItem(SK);
+    if(s){const d=JSON.parse(s);if(!d.snapshots)d.snapshots=[];if(!Array.isArray(d.builds))d.builds=Object.values(d.builds);return d;}
+  }catch(e){}
+  return JSON.parse(JSON.stringify(DEF));
+}
+function persist(){
+  localStorage.setItem(SK,JSON.stringify(S));
+  db.from('dashboard_state').upsert({id:STATE_ID,state:S,updated_at:new Date().toISOString()});
+}
+function buildById(id){return S.builds.find(b=>b.id===id)||S.builds[0];}
+function gpuById(id){return S.gpus.find(g=>g.id===id)||S.gpus[0];}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────────────────────────────────────
+let activeTab='dashboard';
+function showTab(id){
+  activeTab=id;
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>{if(t.textContent.trim().toLowerCase().startsWith(id.substring(0,4)))t.classList.add('active');});
+  if(id==='snapshots'){const sel=document.getElementById('sn-build');if(sel)sel.value=dashBid;}
+  updateAll();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPUTE
+// ─────────────────────────────────────────────────────────────────────────────
+function buildCost(bid){return buildById(bid).parts.reduce((s,p)=>s+p.qty*p.price,0);}
+function calc(bid){
+  const b=buildById(bid), g=gpuById(b.gpuId);
+  const gross=b.numGpu*b.rate*(b.util/100)*0.92;
+  const kw=(b.numGpu*g.tdp+100)/1000;
+  const pcost=kw*b.kwh;
+  const net=gross-pcost;
+  const mo=net*24*30, yr=mo>0?mo*12:null, cost=buildCost(bid);
+  return{gross,pcost,net,mo,yr,cost,kw,be:mo>0?cost/mo:null,g,b};
+}
+function f$(n,d=0){
+  if(!isFinite(n))return'∞';
+  const abs=Math.abs(n);
+  const s=d>0?parseFloat(abs.toFixed(d)).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}):Math.round(abs).toLocaleString();
+  return(n<0?'-$':'$')+s;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN UPDATE
+// ─────────────────────────────────────────────────────────────────────────────
+function updateAll(){
+  syncDashBid(); syncPartsBid();
+  renderTopbar();
+  renderDashPills();
+  renderDash();
+  renderPartsPills();
+  renderPartsContent();
+  renderGPUs();
+  renderCompareSelectors();
+  renderCompare();
+  renderEarnings();
+  renderSnapshots();
+  renderSnapshotBuildSelect();
+}
+
+function syncDashBid(){if(!S.builds.find(b=>b.id===dashBid))dashBid=S.builds[0].id;}
+function syncPartsBid(){if(!S.builds.find(b=>b.id===partsBid))partsBid=S.builds[0].id;}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOPBAR
+// ─────────────────────────────────────────────────────────────────────────────
+function renderTopbar(){
+  document.getElementById('tb-builds').innerHTML=S.builds.map(b=>{
+    const e=calc(b.id);
+    const col=pc(b.color).hex;
+    return`<span class="tb-item"><span style="color:${col};">■</span> ${b.name} &nbsp;<b style="color:${col};">${f$(e.cost)}</b> · <b style="color:${col};">${f$(e.mo)}</b>/mo</span>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD PILLS + RENDER
+// ─────────────────────────────────────────────────────────────────────────────
+function renderDashPills(){
+  document.getElementById('dash-pills').innerHTML=
+    S.builds.map(b=>`<button class="pill${dashBid===b.id?' active':''}" onclick="setDash('${b.id}')" style="${dashBid===b.id?`border-color:${pc(b.color).hex}88;color:${pc(b.color).hex};background:${pc(b.color).hex}18;`:''}">■ ${b.name}</button>`).join('')+
+    `<button class="pill-new" onclick="openNB()">+ New Build</button>`+
+    `<span style="font-size:12px;color:var(--text3);margin-left:4px;">Select build to adjust</span>`;
+}
+
+function setDash(bid){dashBid=bid;updateAll();}
+
+function renderDash(){
+  const e=calc(dashBid);
+  const b=e.b;
+  const col=pc(b.color).hex;
+
+  document.getElementById('dash-build-name').textContent=b.name;
+  document.getElementById('dash-build-name').style.color=col;
+
+  document.getElementById('dash-metrics').innerHTML=[
+    mc('Build Cost',f$(e.cost),'total parts','mv-blue'),
+    mc('Net / Hour',f$(e.net,2),'after electricity',e.net>=0?'mv-cyan':'mv-orange'),
+    mc('Monthly Profit',f$(e.mo),'30-day estimate',e.mo>=0?'mv-cyan':'mv-orange'),
+    e.yr!==null
+      ? mc('Year After Break-even',f$(e.yr),'12 mo post ROI','mv-cyan')
+      : `<div class="card"><div class="card-title">Year After Break-even</div><div class="mv mv-orange">Unprofitable</div><div class="metric-sub" style="line-height:1.7;">electricity cost exceeds earnings<br><span style="font-family:var(--mono);font-size:11px;color:var(--text2);">${f$(e.gross*24*360)}/yr gross<br>− ${f$(e.pcost*24*360)}/yr electricity<br><span style="color:var(--orange);">= ${f$(e.net*24*360)}/yr net</span></span></div></div>`,
+    e.be!==null
+      ? mc('Break-even',e.be.toFixed(1)+' mo','months to ROI','mv-purple')
+      : mc('Break-even','Unprofitable','electricity cost exceeds earnings','mv-orange'),
+    mc('Power Draw',e.kw.toFixed(2)+' kW',f$(e.pcost*24*30)+'/mo electricity','mv-orange'),
+  ].join('');
+
+  document.getElementById('dash-gpu-info').innerHTML=`
+    <div style="display:flex;align-items:center;gap:11px;">
+      <div><div style="font-size:15px;font-weight:600;">${e.g.name}</div>
+      <div style="font-size:12px;color:var(--text2);">${e.g.gen} · ${e.g.vram}GB VRAM · ${e.g.tdp}W TDP · ${b.numGpu}× units</div></div>
+      <span class="badge ${e.g.badge}" style="margin-left:auto;">${e.g.gen}</span>
+    </div>`;
+
+  document.getElementById('dash-sliders').innerHTML=
+    sHtml('d-rate','Price / GPU / hr',0.05,3.00,0.05,b.rate,col,'$',2)+
+    sHtml('d-util','Utilization %',10,100,5,b.util,col,'','0','%')+
+    sHtml('d-kwh','Electricity $/kWh',0.06,0.42,0.01,b.kwh,col,'$',2)+
+    sHtml('d-ngpu','Number of GPUs',1,8,1,b.numGpu,col,'','0');
+
+  const bid=dashBid;
+  document.getElementById('d-rate').oninput=ev=>{buildById(bid).rate=parseFloat(ev.target.value);persist();updateAll();};
+  document.getElementById('d-util').oninput=ev=>{buildById(bid).util=parseInt(ev.target.value);persist();updateAll();};
+  document.getElementById('d-kwh').oninput=ev=>{buildById(bid).kwh=parseFloat(ev.target.value);persist();updateAll();};
+  document.getElementById('d-ngpu').oninput=ev=>{buildById(bid).numGpu=parseInt(ev.target.value);persist();updateAll();};
+
+  const gm=e.gross*24*30, pm=e.pcost*24*30, nm=e.mo;
+  const mx=Math.max(gm,1);
+  document.getElementById('rev-chart').innerHTML=[
+    bar('Gross/mo',gm,mx,col,f$(gm)),
+    bar('Electricity',pm,mx,'var(--orange)',f$(pm)),
+    bar('Net/mo',Math.max(0,nm),mx,nm>=0?col:'var(--orange)',f$(nm)),
+    bar('Yr Post Break-even',Math.max(0,e.yr||0),Math.max(e.yr||0,1),'var(--text3)',e.yr!==null?f$(e.yr):'—'),
+  ].join('');
+
+  const now=new Date();
+  const pts=[...new Set([3,6,12,isFinite(e.be)?Math.ceil(e.be):null].filter(Boolean))];
+  document.getElementById('roi-tl').innerHTML=pts.map(m=>{
+    const d=new Date(now);d.setMonth(d.getMonth()+m);
+    const earned=e.mo*m, isBE=isFinite(e.be)&&Math.ceil(e.be)===m;
+    const c=isBE?'var(--warning)':col;
+    return`<div class="tl-item"><div class="tl-dot" style="background:${c};"></div>
+      <div class="tl-date">${d.toLocaleDateString('en-US',{month:'short',year:'numeric'})} (${m} mo)</div>
+      <div class="tl-event">${isBE?'Break-even reached':earned>e.cost?'Profitable':'In payback'}</div>
+      <div class="tl-amt" style="color:${c};">${f$(earned)} earned · ${f$(Math.max(0,earned-e.cost))} net</div>
+    </div>`;
+  }).join('')||'<span style="color:var(--text3);font-size:12px;">Adjust sliders above</span>';
+}
+
+function sHtml(id,label,min,max,step,val,col,pre='',dec='0',suf=''){
+  const dv=dec==='0'?Math.round(val)+suf:pre+parseFloat(val).toFixed(parseInt(dec));
+  return`<div class="srow"><span class="slabel">${label}</span>
+    <input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}" style="accent-color:${col};">
+    <span class="sval" id="${id}-out" style="color:${col};">${dv}</span></div>`;
+}
+function mc(label,val,sub,cls){return`<div class="card"><div class="card-title">${label}</div><div class="mv ${cls}">${val}</div><div class="metric-sub">${sub}</div></div>`;}
+function bar(label,val,max,col,display){
+  const p=Math.max(0,Math.min(100,(val/Math.max(max,1))*100));
+  return`<div class="brow"><span class="blabel">${label}</span><div class="btrack"><div class="bfill" style="width:${p.toFixed(1)}%;background:${col};"></div></div><span class="bval">${display}</span></div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW BUILD
+// ─────────────────────────────────────────────────────────────────────────────
+function openNB(){
+  // populate GPU select
+  document.getElementById('nb-gpu').innerHTML=S.gpus.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  // pick unused color
+  const used=S.builds.map(b=>b.color);
+  nbColor=PALETTE.find(p=>!used.includes(p.id))?.id||'purple';
+  // render swatches
+  document.getElementById('nb-colors').innerHTML=PALETTE.map(p=>`
+    <div class="color-swatch${nbColor===p.id?' selected':''}" style="background:${p.hex};" title="${p.label}" onclick="pickColor('${p.id}')"></div>`).join('');
+  document.getElementById('nb-name').value='';
+  document.getElementById('nb-rate').value='';
+  document.getElementById('nb-kwh').value='0.12';
+  document.getElementById('nb-ngpu').value='2';
+  document.getElementById('nb-util').value='70';
+  document.getElementById('nbmodal').classList.add('open');
+}
+function pickColor(id){
+  nbColor=id;
+  document.querySelectorAll('.color-swatch').forEach(el=>el.classList.toggle('selected',el.title===PALETTE.find(p=>p.id===id).label));
+}
+function closeNB(){document.getElementById('nbmodal').classList.remove('open');}
+function createBuild(){
+  const name=document.getElementById('nb-name').value.trim()||'New Build';
+  const gpuId=document.getElementById('nb-gpu').value;
+  const g=gpuById(gpuId);
+  const rate=parseFloat(document.getElementById('nb-rate').value)||g.rate;
+  const util=parseInt(document.getElementById('nb-util').value)||70;
+  const kwh=parseFloat(document.getElementById('nb-kwh').value)||0.12;
+  const numGpu=parseInt(document.getElementById('nb-ngpu').value)||2;
+  const id='b'+Date.now();
+  S.builds.push({id,color:nbColor,name,gpuId,numGpu,rate,util,kwh,parts:[]});
+  partsBid=id; dashBid=id;
+  persist(); closeNB();
+  showTab('parts');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARTS
+// ─────────────────────────────────────────────────────────────────────────────
+function renderPartsPills(){
+  document.getElementById('parts-pills').innerHTML=
+    S.builds.map(b=>`<button class="pill${partsBid===b.id?' active':''}" onclick="setParts('${b.id}')" style="${partsBid===b.id?`border-color:${pc(b.color).hex}88;color:${pc(b.color).hex};background:${pc(b.color).hex}18;`:''}">■ ${b.name}</button>`).join('')+
+    `<button class="pill-new" onclick="openNB()">+ New Build</button>`;
+}
+
+function setParts(bid){partsBid=bid;updateAll();}
+
+function renderPartsContent(){
+  const b=buildById(partsBid);
+  const col=pc(b.color).hex;
+  const cost=buildCost(partsBid);
+  document.getElementById('parts-content').innerHTML=`
+    <div class="sec-hdr">
+      <h2 style="color:${col};">${b.name} — Parts List</h2>
+      <div style="display:flex;gap:7px;align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="openRename('${b.id}')">Rename</button>
+        ${S.builds.length>1?`<button class="btn btn-danger btn-sm" onclick="deleteBuild('${b.id}')">Delete Build</button>`:''}
+        <button class="btn btn-sm" style="background:${col};color:#000;font-weight:600;" onclick="addPart('${b.id}')">+ Add Part</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:13px;">
+      <table class="dt">
+        <thead><tr><th style="width:14%">Category</th><th style="width:31%">Part</th><th style="width:22%">Notes</th><th style="width:5%">Qty</th><th class="pc" style="width:12%">Unit</th><th class="pc" style="width:12%">Total</th><th style="width:4%"></th></tr></thead>
+        <tbody id="pb-active">${renderPartsRows(b.id)}</tbody>
+        <tfoot><tr class="tr-tot"><td colspan="5">Total Build Cost</td><td class="pc" style="color:${col};">$${cost.toLocaleString()}</td><td></td></tr></tfoot>
+      </table>
+    </div>
+    <div style="display:flex;gap:7px;">
+      <button class="btn btn-ghost btn-sm" onclick="expJSON('${b.id}')">Export JSON</button>
+      <button class="btn btn-ghost btn-sm" onclick="impJSON('${b.id}')">Import JSON</button>
+    </div>`;
+}
+
+function renderPartsRows(bid){
+  return buildById(bid).parts.map(p=>`<tr>
+    <td><span class="tag">${p.cat}</span></td>
+    <td style="font-weight:500;">${p.name}</td>
+    <td style="color:var(--text2);font-size:12px;">${p.notes||'—'}</td>
+    <td style="font-family:var(--mono);">${p.qty}</td>
+    <td class="pc">$${p.price.toLocaleString()}</td>
+    <td class="pc">$${(p.qty*p.price).toLocaleString()}</td>
+    <td><div style="display:flex;gap:4px;">
+      <button class="btn btn-ghost btn-sm" onclick="editPart('${bid}','${p.id}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="delPart('${bid}','${p.id}')">✕</button>
+    </div></td>
+  </tr>`).join('')||`<tr><td colspan="7" style="color:var(--text3);font-size:12px;padding:20px 0;">No parts yet — click "+ Add Part" to start building your list.</td></tr>`;
+}
+
+function addPart(bid){editPid=null;editPbid=bid;openPM(bid,'Add Part — '+buildById(bid).name);}
+function editPart(bid,id){
+  editPid=id;editPbid=bid;
+  const p=buildById(bid).parts.find(x=>x.id===id);
+  openPM(bid,'Edit Part — '+buildById(bid).name);
+  document.getElementById('pf-cat').value=p.cat;
+  document.getElementById('pf-name').value=p.name;
+  document.getElementById('pf-notes').value=p.notes||'';
+  document.getElementById('pf-qty').value=p.qty;
+  document.getElementById('pf-price').value=p.price;
+}
+function openPM(bid,title){
+  const col=pc(buildById(bid).color).hex;
+  document.getElementById('pmodal-title').textContent=title;
+  document.getElementById('psave-btn').style.background=col;
+  document.getElementById('psave-btn').style.color='#000';
+  if(!editPid){['pf-cat','pf-name','pf-notes'].forEach(i=>document.getElementById(i).value='');document.getElementById('pf-qty').value=1;document.getElementById('pf-price').value='';}
+  document.getElementById('pmodal').classList.add('open');
+}
+function savePart(){
+  const cat=document.getElementById('pf-cat').value.trim();
+  const name=document.getElementById('pf-name').value.trim();
+  const notes=document.getElementById('pf-notes').value.trim();
+  const qty=parseInt(document.getElementById('pf-qty').value)||1;
+  const price=parseFloat(document.getElementById('pf-price').value)||0;
+  if(!name)return;
+  const bid=editPbid;
+  const b=buildById(bid);
+  if(editPid){Object.assign(b.parts.find(x=>x.id===editPid),{cat,name,notes,qty,price});}
+  else{b.parts.push({id:'p'+Date.now(),cat,name,notes,qty,price});}
+  persist();closePM();updateAll();
+}
+function delPart(bid,id){buildById(bid).parts=buildById(bid).parts.filter(p=>p.id!==id);persist();updateAll();}
+function closePM(){document.getElementById('pmodal').classList.remove('open');}
+
+function deleteBuild(bid){
+  if(S.builds.length<=1)return;
+  if(!confirm('Delete this build? This cannot be undone.'))return;
+  S.builds=S.builds.filter(b=>b.id!==bid);
+  if(dashBid===bid)dashBid=S.builds[0].id;
+  if(partsBid===bid)partsBid=S.builds[0].id;
+  persist();updateAll();
+}
+
+function openRename(bid){renameBid=bid;document.getElementById('rn-name').value=buildById(bid).name;document.getElementById('rnmodal').classList.add('open');}
+function closeRN(){document.getElementById('rnmodal').classList.remove('open');}
+function doRename(){const n=document.getElementById('rn-name').value.trim();if(n&&renameBid)buildById(renameBid).name=n;persist();closeRN();updateAll();}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GPU MANAGER
+// ─────────────────────────────────────────────────────────────────────────────
+function renderGPUs(){
+  document.getElementById('gpu-cards').innerHTML=S.gpus.map(g=>{
+    const usedIn=S.builds.filter(b=>b.gpuId===g.id);
+    const pills=usedIn.map(b=>`<span class="badge" style="background:${pc(b.color).hex}22;color:${pc(b.color).hex};border:1px solid ${pc(b.color).hex}44;font-size:9px;">${b.name}</span>`).join(' ');
+    const assignBtns=S.builds.map(b=>`<button class="btn btn-ghost btn-sm" style="color:${pc(b.color).hex};border-color:${pc(b.color).hex}55;" onclick="assignGPU('${b.id}','${g.id}')">→ ${b.name}</button>`).join('');
+    return`<div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:9px;">
+        <span class="badge ${g.badge}">${g.gen}</span>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-ghost btn-sm" onclick="openEditGPU('${g.id}')">Edit</button>
+          ${S.gpus.length>1?`<button class="btn btn-danger btn-sm" onclick="delGPU('${g.id}')">✕</button>`:''}
+        </div>
+      </div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:2px;">${g.name}</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--cyan);margin-bottom:11px;">$${g.price.toLocaleString()}</div>
+      <div style="font-size:12px;color:var(--text2);display:flex;flex-direction:column;gap:4px;margin-bottom:11px;">
+        <div style="display:flex;justify-content:space-between;"><span>VRAM</span><span style="color:var(--text)">${g.vram}GB</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>TDP</span><span style="color:var(--text)">${g.tdp}W</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Vast rate</span><span style="color:var(--cyan);">$${g.rate.toFixed(2)}/hr</span></div>
+      </div>
+      ${pills?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${pills}</div>`:''}
+      <div style="display:flex;flex-direction:column;gap:5px;">${assignBtns}</div>
+    </div>`;
+  }).join('');
+
+  const mp=Math.max(...S.gpus.map(g=>g.price),1);
+  const mv=Math.max(...S.gpus.map(g=>g.vram),1);
+  const mr=Math.max(...S.gpus.map(g=>g.rate),1);
+  document.getElementById('gpu-cmp').innerHTML=
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:7px;font-family:var(--mono);">PRICE</div>'+
+    S.gpus.map(g=>bar(g.name,g.price,mp,'var(--blue)','$'+g.price.toLocaleString())).join('')+
+    '<div style="font-size:10px;color:var(--text3);margin:12px 0 7px;font-family:var(--mono);">VRAM</div>'+
+    S.gpus.map(g=>bar(g.name,g.vram,mv,'var(--purple)',g.vram+'GB')).join('')+
+    '<div style="font-size:10px;color:var(--text3);margin:12px 0 7px;font-family:var(--mono);">VAST RATE</div>'+
+    S.gpus.map(g=>bar(g.name,g.rate,mr,'var(--cyan)','$'+g.rate.toFixed(2)+'/hr')).join('');
+}
+
+function assignGPU(bid,gid){buildById(bid).gpuId=gid;buildById(bid).rate=gpuById(gid).rate;persist();updateAll();}
+function openAddGPU(){editGid=null;document.getElementById('gmodal-title').textContent='Add GPU';['gf-name','gf-price','gf-vram','gf-tdp','gf-rate','gf-gen'].forEach(i=>document.getElementById(i).value='');document.getElementById('gmodal').classList.add('open');}
+function openEditGPU(id){
+  editGid=id;const g=S.gpus.find(x=>x.id===id);
+  document.getElementById('gmodal-title').textContent='Edit GPU';
+  document.getElementById('gf-name').value=g.name;document.getElementById('gf-price').value=g.price;
+  document.getElementById('gf-vram').value=g.vram;document.getElementById('gf-tdp').value=g.tdp;
+  document.getElementById('gf-rate').value=g.rate;document.getElementById('gf-gen').value=g.gen;
+  document.getElementById('gf-badge').value=g.badge;
+  document.getElementById('gmodal').classList.add('open');
+}
+function saveGPU(){
+  const name=document.getElementById('gf-name').value.trim();if(!name)return;
+  const data={name,price:parseFloat(document.getElementById('gf-price').value)||0,vram:parseInt(document.getElementById('gf-vram').value)||0,tdp:parseInt(document.getElementById('gf-tdp').value)||300,rate:parseFloat(document.getElementById('gf-rate').value)||0.50,gen:document.getElementById('gf-gen').value.trim()||'Unknown',badge:document.getElementById('gf-badge').value};
+  if(editGid){Object.assign(S.gpus.find(g=>g.id===editGid),data);}
+  else{S.gpus.push({id:'g'+Date.now(),...data});}
+  persist();closeGM();updateAll();
+}
+function delGPU(id){
+  if(S.gpus.length<=1)return;
+  S.gpus=S.gpus.filter(g=>g.id!==id);
+  S.builds.forEach(b=>{if(b.gpuId===id)b.gpuId=S.gpus[0].id;});
+  persist();updateAll();
+}
+function closeGM(){document.getElementById('gmodal').classList.remove('open');}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPARE
+// ─────────────────────────────────────────────────────────────────────────────
+function renderCompareSelectors(){
+  const opts=S.builds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  const sa=document.getElementById('cmp-sel-a'), sb=document.getElementById('cmp-sel-b');
+  const va=sa.value, vb=sb.value;
+  sa.innerHTML=opts; sb.innerHTML=opts;
+  sa.value=S.builds.find(b=>b.id===va)?va:S.builds[0].id;
+  sb.value=S.builds.find(b=>b.id===vb)?vb:(S.builds[1]||S.builds[0]).id;
+}
+
+function renderCompare(){
+  const idA=document.getElementById('cmp-sel-a').value;
+  const idB=document.getElementById('cmp-sel-b').value;
+  const ea=calc(idA), eb=calc(idB);
+  const colA=pc(ea.b.color).hex, colB=pc(eb.b.color).hex;
+
+  const diff=eb.mo-ea.mo;
+  const msg=Math.abs(diff)<1?'Builds are essentially equal at current settings':
+    diff>0?`${eb.b.name} leads — ${f$(diff)}/mo more profit`:
+    `${ea.b.name} leads — ${f$(-diff)}/mo more profit`;
+  const stripCol=Math.abs(diff)<1?'var(--text2)':diff>0?colB:colA;
+  document.getElementById('cmp-strip').innerHTML=`<div class="win-strip" style="color:${stripCol};border-color:${stripCol}33;">${msg}</div>`;
+
+  document.getElementById('cmp-head').innerHTML=[
+    cm2('Build Cost',f$(ea.cost),f$(eb.cost),ea.b.name,eb.b.name,ea.cost<eb.cost?colA:colB,ea.cost<eb.cost?colB:colA,'lower wins'),
+    cm2('Monthly Profit',f$(ea.mo),f$(eb.mo),ea.b.name,eb.b.name,ea.mo>eb.mo?colA:colB,ea.mo>eb.mo?colB:colA,'higher wins'),
+    cm2('Break-even',isFinite(ea.be)?ea.be.toFixed(1)+' mo':'∞',isFinite(eb.be)?eb.be.toFixed(1)+' mo':'∞',ea.b.name,eb.b.name,ea.be<eb.be?colA:colB,ea.be<eb.be?colB:colA,'lower wins'),
+  ].join('');
+
+  const mxC=Math.max(ea.cost,eb.cost,1);
+  const gpuA=ea.b.parts.reduce((s,p)=>p.cat.toLowerCase().includes('gpu')?s+p.qty*p.price:s,0);
+  const gpuB=eb.b.parts.reduce((s,p)=>p.cat.toLowerCase().includes('gpu')?s+p.qty*p.price:s,0);
+  document.getElementById('cmp-cost').innerHTML=[
+    bar(ea.b.name,ea.cost,mxC,colA,f$(ea.cost)),
+    bar(eb.b.name,eb.cost,mxC,colB,f$(eb.cost)),
+    `<div style="border-top:1px solid var(--border);margin:10px 0;"></div>`,
+    bar(ea.b.name+' GPU',gpuA,mxC,colA,f$(gpuA)),
+    bar(eb.b.name+' GPU',gpuB,mxC,colB,f$(gpuB)),
+    bar('Other ('+ea.b.name+')',ea.cost-gpuA,mxC,'var(--text3)',f$(ea.cost-gpuA)),
+  ].join('');
+
+  const mxE=Math.max(ea.mo,eb.mo,ea.gross*24*30,eb.gross*24*30,1);
+  document.getElementById('cmp-earn').innerHTML=[
+    bar(ea.b.name+' gross/mo',ea.gross*24*30,mxE,colA,f$(ea.gross*24*30)),
+    bar(eb.b.name+' gross/mo',eb.gross*24*30,mxE,colB,f$(eb.gross*24*30)),
+    bar(ea.b.name+' net/mo',Math.max(0,ea.mo),mxE,colA,f$(ea.mo)),
+    bar(eb.b.name+' net/mo',Math.max(0,eb.mo),mxE,colB,f$(eb.mo)),
+    bar(ea.b.name+' yr post B/E',Math.max(0,ea.yr||0),Math.max(ea.yr||0,eb.yr||0,1),colA,ea.yr!==null?f$(ea.yr):'—'),
+    bar(eb.b.name+' yr post B/E',Math.max(0,eb.yr||0),Math.max(ea.yr||0,eb.yr||0,1),colB,eb.yr!==null?f$(eb.yr):'—'),
+  ].join('');
+
+  const ga=gpuById(ea.b.gpuId), gb=gpuById(eb.b.gpuId);
+  const rows=[
+    ['GPU',ga.name,gb.name,null],
+    ['VRAM',ga.vram+'GB',gb.vram+'GB',gb.vram>ga.vram?'b':ga.vram>gb.vram?'a':null],
+    ['GPU TDP',ga.tdp+'W ea',gb.tdp+'W ea',gb.tdp<ga.tdp?'b':ga.tdp<gb.tdp?'a':null],
+    ['GPU count',ea.b.numGpu,eb.b.numGpu,null],
+    ['Vast rate','$'+ga.rate.toFixed(2)+'/hr','$'+gb.rate.toFixed(2)+'/hr',gb.rate>ga.rate?'b':ga.rate>gb.rate?'a':null],
+    ['Build cost',f$(ea.cost),f$(eb.cost),ea.cost<eb.cost?'a':'b'],
+    ['Power draw',ea.kw.toFixed(2)+'kW',eb.kw.toFixed(2)+'kW',eb.kw<ea.kw?'b':ea.kw<eb.kw?'a':null],
+    ['Net / hr',f$(ea.net,2),f$(eb.net,2),eb.net>ea.net?'b':ea.net>eb.net?'a':null],
+    ['Monthly profit',f$(ea.mo),f$(eb.mo),eb.mo>ea.mo?'b':ea.mo>eb.mo?'a':null],
+    ['Yr after break-even',ea.yr!==null?f$(ea.yr):'—',eb.yr!==null?f$(eb.yr):'—',(eb.yr||0)>(ea.yr||0)?'b':(ea.yr||0)>(eb.yr||0)?'a':null],
+    ['Break-even',ea.be!==null?ea.be.toFixed(1)+' mo':'Unprofitable',eb.be!==null?eb.be.toFixed(1)+' mo':'Unprofitable',ea.be!==null&&eb.be!==null?(ea.be<eb.be?'a':eb.be<ea.be?'b':null):ea.be!==null?'a':eb.be!==null?'b':null],
+  ];
+  document.getElementById('cmp-spec').innerHTML=`
+    <thead><tr><th style="width:28%">Spec</th><th style="text-align:right;width:28%;color:${colA};">${ea.b.name}</th><th style="text-align:right;width:28%;color:${colB};">${eb.b.name}</th><th style="width:16%"></th></tr></thead>
+    <tbody>${rows.map(([l,va,vb,w])=>`<tr>
+      <td style="color:var(--text2);font-size:12px;">${l}</td>
+      <td style="${w==='a'?`color:${colA};font-weight:600;`:''}">${va}</td>
+      <td style="${w==='b'?`color:${colB};font-weight:600;`:''}">${vb}</td>
+      <td style="text-align:right;">${w?`<span class="wbadge" style="background:${w==='a'?colA:colB}22;color:${w==='a'?colA:colB};">${w==='a'?ea.b.name:eb.b.name}</span>`:''}</td>
+    </tr>`).join('')}</tbody>`;
+
+  const allCats=[...new Set([...ea.b.parts.map(p=>p.cat),...eb.b.parts.map(p=>p.cat)])];
+  let dRows='';
+  allCats.forEach(cat=>{
+    const pa=ea.b.parts.filter(p=>p.cat===cat), pb=eb.b.parts.filter(p=>p.cat===cat);
+    const na=pa.map(p=>p.name).join(', ')||'—', nb=pb.map(p=>p.name).join(', ')||'—';
+    if(na===nb)return;
+    const d=pb.reduce((s,p)=>s+p.qty*p.price,0)-pa.reduce((s,p)=>s+p.qty*p.price,0);
+    dRows+=`<tr><td><span class="tag">${cat}</span></td><td style="font-size:12px;color:var(--text2);">${na}</td><td style="font-size:12px;color:var(--text2);">${nb}</td><td class="pc" style="color:${d>0?'var(--orange)':d<0?'var(--cyan)':'var(--text2)'};">${d>0?'+':''}${f$(d)}</td></tr>`;
+  });
+  document.getElementById('parts-diff').innerHTML=`<thead><tr><th style="width:14%">Category</th><th style="width:35%;color:${colA}">${ea.b.name}</th><th style="width:35%;color:${colB}">${eb.b.name}</th><th class="pc" style="width:16%">Δ Cost</th></tr></thead><tbody>${dRows||'<tr><td colspan="4" style="color:var(--text3);font-size:12px;padding:16px 0;">No differences found.</td></tr>'}</tbody>`;
+}
+
+function cm2(label,va,vb,nameA,nameB,winCol,loseCol,hint){
+  return`<div class="card"><div class="card-title">${label} <span style="font-size:9px;color:var(--text3);">${hint}</span></div>
+    <div style="display:flex;gap:18px;margin-top:4px;">
+      <div><div class="mv" style="color:${winCol};">${va}</div><div class="metric-sub" style="color:${winCol};">${nameA}</div></div>
+      <div><div class="mv" style="font-size:20px;color:var(--text3);">${vb}</div><div class="metric-sub" style="color:var(--text3);">${nameB}</div></div>
+    </div></div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EARNINGS
+// ─────────────────────────────────────────────────────────────────────────────
+function renderEarnings(){
+  const calcs=S.builds.map(b=>({b,e:calc(b.id)}));
+  document.getElementById('earn-metrics').innerHTML=calcs.slice(0,3).map(({b,e})=>{
+    const col=pc(b.color).hex;
+    return`<div class="card"><div class="card-title">${b.name}</div><div class="mv" style="color:${col};">${f$(e.net,2)}/hr</div><div class="metric-sub">${f$(e.mo)}/mo · ${isFinite(e.be)?e.be.toFixed(1)+' mo BE':'∞ BE'}</div></div>`;
+  }).join('');
+
+  const rates=[0.50,0.75,1.00,1.25,1.50,1.75,2.00,2.50,3.00];
+  const mxM=Math.max(...rates.flatMap(r=>calcs.map(({b,e})=>calcAt(b.id,r))),1);
+  document.getElementById('rate-chart').innerHTML=rates.map(r=>{
+    return`<div style="margin-bottom:7px;">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:3px;">$${r.toFixed(2)}/hr</div>
+      ${calcs.map(({b})=>bar(b.name,Math.max(0,calcAt(b.id,r)),mxM,pc(b.color).hex,f$(calcAt(b.id,r)))).join('')}
+    </div>`;
+  }).join('');
+
+  document.getElementById('be-detail').innerHTML=calcs.map(({b,e})=>{
+    const col=pc(b.color).hex;
+    return isFinite(e.be)?`
+      <div style="margin-bottom:14px;">
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">${b.name}</div>
+        <div class="mv" style="font-size:22px;color:${col};">${e.be.toFixed(1)} mo</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.9;margin-top:5px;">
+          Monthly net: <span style="color:var(--text);">${f$(e.mo)}</span> &nbsp;·&nbsp;
+          Yr1: <span style="${e.mo*12>e.cost?`color:${col}`:'color:var(--orange)'};">${f$(e.mo*12-e.cost)}</span> &nbsp;·&nbsp;
+          Yr2: <span style="color:${col};">${f$(e.mo*24-e.cost)}</span>
+        </div>
+      </div><hr style="border:none;border-top:1px solid var(--border);margin:10px 0;">`:
+    `<div style="margin-bottom:14px;"><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">${b.name}</div><div class="mv mv-orange">∞</div><div class="metric-sub">Not profitable at current settings.</div></div><hr style="border:none;border-top:1px solid var(--border);margin:10px 0;">`;
+  }).join('');
+}
+
+function calcAt(bid,rate){
+  const b=buildById(bid),g=gpuById(b.gpuId);
+  return(b.numGpu*rate*(b.util/100)*0.92-(b.numGpu*g.tdp+100)/1000*b.kwh)*24*30;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SNAPSHOTS
+// ─────────────────────────────────────────────────────────────────────────────
+function renderSnapshotBuildSelect(){
+  const sel=document.getElementById('sn-build');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML=S.builds.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  if(S.builds.find(b=>b.id===cur))sel.value=cur; else sel.value=dashBid;
+}
+
+function saveSnapshot(){
+  const name=document.getElementById('sn-name').value.trim();
+  const note=document.getElementById('sn-note').value.trim();
+  const bid=document.getElementById('sn-build').value;
+  if(!name){document.getElementById('sn-name').focus();return;}
+  const e=calc(bid), b=buildById(bid);
+  S.snapshots.unshift({id:'sn'+Date.now(),name,note,bid,buildName:b.name,buildColor:b.color,gpuName:e.g.name,gpuGen:e.g.gen,numGpu:b.numGpu,rate:b.rate,util:b.util,kwh:b.kwh,monthly:e.mo,breakEven:e.be,buildCost:e.cost,net:e.net,yr:e.yr,ts:Date.now()});
+  // yr and breakEven may be null when unprofitable
+  persist();
+  document.getElementById('sn-name').value='';document.getElementById('sn-note').value='';
+  const btn=document.querySelector('#tab-snapshots .btn-primary');
+  const orig=btn.textContent;btn.textContent='Saved!';btn.style.background='var(--purple)';
+  setTimeout(()=>{btn.textContent=orig;btn.style.background='';},1400);
+  renderSnapshots();
+}
+
+function deleteSnapshot(id){S.snapshots=S.snapshots.filter(s=>s.id!==id);persist();renderSnapshots();}
+
+let sneEditId=null;
+function openSNE(id){
+  sneEditId=id;
+  const sn=S.snapshots.find(s=>s.id===id);if(!sn)return;
+  document.getElementById('sne-name').value=sn.name;
+  document.getElementById('sne-note').value=sn.note||'';
+  document.getElementById('sneditmodal').classList.add('open');
+}
+function closeSNE(){document.getElementById('sneditmodal').classList.remove('open');sneEditId=null;}
+function saveSNE(){
+  const name=document.getElementById('sne-name').value.trim();
+  if(!name){document.getElementById('sne-name').focus();return;}
+  const sn=S.snapshots.find(s=>s.id===sneEditId);
+  if(sn){sn.name=name;sn.note=document.getElementById('sne-note').value.trim();}
+  persist();closeSNE();renderSnapshots();
+}
+
+function loadSnapshot(id){
+  const sn=S.snapshots.find(s=>s.id===id);if(!sn)return;
+  const b=buildById(sn.bid);
+  if(b){b.rate=sn.rate;b.util=sn.util;b.kwh=sn.kwh;b.numGpu=sn.numGpu;persist();}
+  dashBid=sn.bid;showTab('dashboard');
+}
+
+function renderSnapshots(){
+  const snaps=S.snapshots||[];
+  const badge=document.getElementById('snap-count-badge');
+  if(badge)badge.textContent=snaps.length>0?snaps.length:'';
+  if(!document.getElementById('snap-list'))return;
+  if(!snaps.length){
+    document.getElementById('snap-list').innerHTML=`<div class="snap-empty"><div style="font-size:28px;opacity:.3;margin-bottom:10px;">⬡</div><div style="font-size:14px;color:var(--text2);margin-bottom:4px;">No snapshots yet</div><div style="font-size:12px;">Save a scenario above — name it, add your life context, compare over time.</div></div>`;
+    return;
+  }
+  document.getElementById('snap-list').innerHTML=`
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">${snaps.length} snapshot${snaps.length!==1?'s':''}</div>
+    <div class="snap-grid">${snaps.map(sn=>{
+      const col=pc(sn.buildColor||'cyan').hex;
+      const d=new Date(sn.ts);
+      const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      return`<div class="snap-card" style="border-left:3px solid ${col};">
+        <div class="snap-actions">
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="loadSnapshot('${sn.id}')">Load</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="openSNE('${sn.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSnapshot('${sn.id}')">✕</button>
+        </div>
+        <div class="snap-name">${sn.name}</div>
+        <div class="snap-build-tag" style="color:${col};">${sn.buildName} · ${sn.gpuName} × ${sn.numGpu}</div>
+        <div class="snap-stats">
+          <div class="snap-stat"><div class="snap-stat-label">Monthly net</div><div class="snap-stat-val" style="color:${sn.monthly>=0?col:'var(--orange)'};">${f$(sn.monthly)}</div></div>
+          <div class="snap-stat"><div class="snap-stat-label">Break-even</div><div class="snap-stat-val" style="color:${sn.breakEven!==null?'inherit':'var(--orange)'};">${sn.breakEven!==null?sn.breakEven.toFixed(1)+' mo':'Unprofitable'}</div></div>
+          <div class="snap-stat"><div class="snap-stat-label">Build cost</div><div class="snap-stat-val">${f$(sn.buildCost)}</div></div>
+          <div class="snap-stat"><div class="snap-stat-label">Net / hr</div><div class="snap-stat-val">${f$(sn.net,2)}</div></div>
+          <div class="snap-stat"><div class="snap-stat-label">Rate</div><div class="snap-stat-val">$${sn.rate.toFixed(2)}/hr</div></div>
+          <div class="snap-stat"><div class="snap-stat-label">Electricity</div><div class="snap-stat-val">$${sn.kwh.toFixed(2)}/kWh</div></div>
+          <div class="snap-stat" style="grid-column:1/-1;"><div class="snap-stat-label">Yr after break-even</div><div class="snap-stat-val" style="font-size:17px;color:${sn.yr!==null?col:'var(--orange)'};">${sn.yr!==null?f$(sn.yr):'—'}</div></div>
+        </div>
+        ${sn.note?`<div class="snap-usecase"><div class="snap-usecase-label">Use case &amp; context</div><div class="snap-usecase-text">${sn.note.replace(/</g,'&lt;')}</div></div>`:''}
+        <div class="snap-date">${ds} · ${sn.util}% util</div>
+      </div>`;
+    }).join('')}</div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORT / EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
+function expJSON(bid){
+  const b=buildById(bid);
+  const blob=new Blob([JSON.stringify({build:b,gpus:S.gpus},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`ai-rig-${b.name.replace(/\s+/g,'-').toLowerCase()}.json`;a.click();
+}
+function impJSON(bid){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.build&&d.build.parts){Object.assign(buildById(bid),d.build);if(d.gpus)S.gpus=d.gpus;persist();updateAll();}}catch{alert('Invalid JSON.');}};r.readAsText(f);};
+  inp.click();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+['gmodal','pmodal','nbmodal','rnmodal','sneditmodal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+});
+
+async function initApp(){
+  const loader=document.getElementById('db-loader');
+  if(loader)loader.style.display='flex';
+  S=await loadFromDB();
+  dashBid=S.builds[0].id;
+  partsBid=S.builds[0].id;
+  if(loader)loader.style.display='none';
+  updateAll();
+}
+window.addEventListener('load',initApp);
+</script>
+</body>
+</html>
