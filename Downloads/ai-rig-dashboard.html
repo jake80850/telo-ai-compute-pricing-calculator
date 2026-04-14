@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Rig Builder — Vast.ai Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111318;
+    --bg3: #181c22;
+    --bg4: #1e2330;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --text2: #8b92a8;
+    --text3: #555e75;
+    --accent: #00d4aa;
+    --accent2: #0099ff;
+    --accent3: #ff6b35;
+    --danger: #ff4757;
+    --success: #00d4aa;
+    --warning: #ffb800;
+    --purple: #8b5cf6;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --r: 6px;
+    --r2: 10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* LAYOUT */
+  .topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .topbar-stat { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+  .topbar-stat span { color: var(--accent); font-weight: 600; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
+
+  .tabs { display: flex; gap: 2px; margin-bottom: 28px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); padding: 4px; width: fit-content; }
+  .tab { padding: 7px 20px; border-radius: var(--r); font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text2); border: none; background: none; transition: all 0.15s; font-family: var(--sans); }
+  .tab.active { background: var(--bg4); color: var(--text); border: 1px solid var(--border2); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* GRID */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+
+  /* CARDS */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r2);
+    padding: 20px;
+  }
+  .card-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* METRIC */
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .metric-val.green { color: var(--accent); }
+  .metric-val.blue { color: var(--accent2); }
+  .metric-val.orange { color: var(--accent3); }
+  .metric-val.purple { color: var(--purple); }
+  .metric-sub { font-size: 12px; color: var(--text3); }
+
+  /* TABLE */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    padding: 0 12px 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 11px 12px 11px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text);
+    vertical-align: middle;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr.total-row td { color: var(--accent); font-weight: 600; font-family: var(--mono); border-top: 1px solid var(--border2); border-bottom: none; padding-top: 14px; }
+  .price-cell { font-family: var(--mono); text-align: right; white-space: nowrap; }
+
+  /* BADGES */
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+  }
+  .badge-cyan { background: rgba(0,212,170,0.12); color: var(--accent); border: 1px solid rgba(0,212,170,0.25); }
+  .badge-blue { background: rgba(0,153,255,0.12); color: var(--accent2); border: 1px solid rgba(0,153,255,0.25); }
+  .badge-orange { background: rgba(255,107,53,0.12); color: var(--accent3); border: 1px solid rgba(255,107,53,0.25); }
+  .badge-purple { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.25); }
+  .badge-gray { background: rgba(255,255,255,0.05); color: var(--text2); border: 1px solid var(--border); }
+
+  /* SLIDERS */
+  .slider-block { margin-bottom: 18px; }
+  .slider-row { display: flex; align-items: center; gap: 14px; }
+  .slider-label { font-size: 13px; color: var(--text2); width: 160px; flex-shrink: 0; }
+  .slider-val { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); min-width: 64px; text-align: right; }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--bg4);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  /* FORM INPUTS */
+  input[type=text], input[type=number], select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  input[type=text]:focus, input[type=number]:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--bg2); }
+
+  /* BUTTONS */
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--r);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    font-family: var(--sans);
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(255,71,87,0.3); }
+  .btn-danger:hover { background: rgba(255,71,87,0.1); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* COMPARE SECTION */
+  .compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .gpu-compare-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r2);
+    padding: 20px;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .gpu-compare-card:hover { border-color: var(--border2); }
+  .gpu-compare-card.selected { border-color: var(--accent); background: rgba(0,212,170,0.04); }
+  .gpu-compare-card .gpu-name { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .gpu-compare-card .gpu-price { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--accent); margin-bottom: 14px; }
+  .gpu-stat { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: var(--text2); }
+  .gpu-stat span:last-child { color: var(--text); font-weight: 500; }
+  .selected-mark {
+    position: absolute; top: 14px; right: 14px;
+    width: 20px; height: 20px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .gpu-compare-card.selected .selected-mark { display: flex; }
+
+  /* GPU EDITOR */
+  .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 11px; color: var(--text3); margin-bottom: 5px; font-family: var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+
+  /* CHART BARS */
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 12px; }
+  .bar-label { font-size: 12px; color: var(--text2); width: 100px; flex-shrink: 0; text-align: right; }
+  .bar-track { flex: 1; background: var(--bg3); border-radius: 2px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s ease; }
+  .bar-fill.blue { background: var(--accent2); }
+  .bar-fill.orange { background: var(--accent3); }
+  .bar-fill.purple { background: var(--purple); }
+  .bar-val { font-family: var(--mono); font-size: 11px; color: var(--text2); width: 70px; }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--r2);
+    padding: 28px;
+    width: 480px;
+    max-width: 90vw;
+  }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* ROI TIMELINE */
+  .timeline { position: relative; padding-left: 20px; }
+  .tl-item { position: relative; padding: 0 0 20px 20px; border-left: 1px solid var(--border); }
+  .tl-item:last-child { border-left: 1px solid transparent; padding-bottom: 0; }
+  .tl-dot { position: absolute; left: -5px; top: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg2); }
+  .tl-date { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+  .tl-event { font-size: 13px; color: var(--text); }
+  .tl-amt { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+  /* NOTICE */
+  .notice { background: rgba(0,153,255,0.08); border: 1px solid rgba(0,153,255,0.2); border-radius: var(--r); padding: 12px 16px; font-size: 12px; color: var(--text2); line-height: 1.7; }
+
+  /* PART EDITOR ROW */
+  .part-row-edit { display: grid; grid-template-columns: 2fr 3fr 1fr 1fr auto; gap: 10px; align-items: center; margin-bottom: 10px; }
+
+  /* SECTION HDR */
+  .section-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-hdr h2 { font-size: 15px; font-weight: 600; }
+
+  .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; }
+
+  @media (max-width: 768px) {
+    .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .part-row-edit { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    AI RIG BUILDER
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-stat">TOTAL BUILD <span id="tb-total">—</span></span>
+    <span class="topbar-stat">NET/MO <span id="tb-month">—</span></span>
+    <span class="topbar-stat">ROI <span id="tb-roi">—</span></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('dashboard')">Dashboard</button>
+    <button class="tab" onclick="showTab('parts')">Parts List</button>
+    <button class="tab" onclick="showTab('gpus')">GPU Manager</button>
+    <button class="tab" onclick="showTab('earnings')">Earnings</button>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div class="panel active" id="tab-dashboard">
+    <div class="grid-3" id="dash-metrics"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Active GPU — Vast.ai Rates</div>
+        <div style="margin-bottom:18px;">
+          <div id="gpu-selected-display"></div>
+        </div>
+        <div class="slider-block">
+          <div class="slider-row">
+            <span class="slider-label">Price / GPU / hr</span>
+            <input type="range" min="0.30" max="3.00" step="0.05" value="1.30" id="d-gpuRate" oninput="updateAll()">
+            <span class="slider-val" id="d-gpuRateOut">$1.30</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Utilization</span>
+            <input type="range" min="10" max="100" step="5" value="70" id="d-util" oninput="updateAll()">
+            <span class="slider-val" id="d-utilOut">70%</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Electricity $/kWh</span>
+            <input type="range" min="0.06" max="0.30" step="0.01" value="0.12" id="d-kwh" oninput="updateAll()">
+            <span class="slider-val" id="d-kwhOut">$0.12</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Number of GPUs</span>
+            <input type="range" min="1" max="8" step="1" value="2" id="d-numGpu" oninput="updateAll()">
+            <span class="slider-val" id="d-numGpuOut">2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Revenue Breakdown</div>
+        <div class="bar-chart" id="rev-chart"></div>
+        <hr class="divider" style="margin: 16px 0;">
+        <div class="card-title">ROI Timeline</div>
+        <div class="timeline" id="roi-timeline"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTS TAB -->
+  <div class="panel" id="tab-parts">
+    <div class="section-hdr">
+      <h2>Parts List</h2>
+      <button class="btn btn-primary btn-sm" onclick="addPart()">+ Add Part</button>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <table class="data-table" id="parts-table">
+        <thead>
+          <tr>
+            <th style="width:18%">Category</th>
+            <th style="width:28%">Part Name</th>
+            <th style="width:22%">Notes</th>
+            <th style="width:10%">Qty</th>
+            <th class="price-cell" style="width:12%">Unit Price</th>
+            <th class="price-cell" style="width:12%">Total</th>
+            <th style="width:6%"></th>
+          </tr>
+        </thead>
+        <tbody id="parts-body"></tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="5">Total Build Cost</td>
+            <td class="price-cell" id="parts-total">$0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="notice">Parts are saved in your browser automatically. Export as JSON to back up or share your build.</div>
+    <div style="margin-top:12px; display:flex; gap:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="exportJSON()">Export JSON</button>
+      <button class="btn btn-ghost btn-sm" onclick="importJSON()">Import JSON</button>
+    </div>
+  </div>
+
+  <!-- GPU MANAGER TAB -->
+  <div class="panel" id="tab-gpus">
+    <div class="section-hdr">
+      <h2>GPU Library</h2>
+      <button class="btn btn-primary btn-sm" onclick="openAddGPU()">+ Add GPU</button>
+    </div>
+    <div class="compare-grid" id="gpu-cards"></div>
+    <div class="card" style="margin-top: 8px;">
+      <div class="card-title">GPU Comparison</div>
+      <div class="bar-chart" id="gpu-compare-chart"></div>
+    </div>
+  </div>
+
+  <!-- EARNINGS TAB -->
+  <div class="panel" id="tab-earnings">
+    <div class="grid-3" id="earnings-metrics"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Monthly Projection by Rate</div>
+        <div class="bar-chart" id="rate-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Break-even Analysis</div>
+        <div id="breakeven-detail"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">Vast.ai Notes</div>
+      <p style="font-size:13px; color: var(--text2); line-height:1.8;">
+        Vast.ai charges an <strong style="color:var(--text)">~8% platform fee</strong> — factor this into your rate input above.
+        You need a reliable <strong style="color:var(--text)">1Gbps+ internet connection</strong> — ideally 10GbE. 
+        Run <strong style="color:var(--text)">Ubuntu 22.04</strong> with their Docker setup (they provide a script). 
+        Pricing fluctuates — peak demand (evenings, weekends) can be 30–50% higher than off-peak. 
+        The <strong style="color:var(--text)">32GB+ VRAM</strong> threshold is important: it unlocks 70B+ LLM workloads that command premium rates. 
+        New GPUs take a few weeks to build rental history and ratings before reaching full utilization.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<!-- GPU ADD MODAL -->
+<div class="modal-overlay" id="gpu-modal">
+  <div class="modal">
+    <div class="modal-title" id="gpu-modal-title">Add GPU</div>
+    <div class="form-grid">
+      <div class="form-group" style="grid-column: 1/-1;">
+        <label>GPU Name</label>
+        <input type="text" id="gf-name" placeholder="e.g. RTX 5090">
+      </div>
+      <div class="form-group">
+        <label>Price per card ($)</label>
+        <input type="number" id="gf-price" placeholder="3999">
+      </div>
+      <div class="form-group">
+        <label>VRAM (GB)</label>
+        <input type="number" id="gf-vram" placeholder="32">
+      </div>
+      <div class="form-group">
+        <label>TDP (Watts)</label>
+        <input type="number" id="gf-tdp" placeholder="575">
+      </div>
+      <div class="form-group">
+        <label>Est. Vast.ai rate ($/hr)</label>
+        <input type="number" id="gf-rate" step="0.05" placeholder="1.30">
+      </div>
+      <div class="form-group">
+        <label>Generation</label>
+        <input type="text" id="gf-gen" placeholder="e.g. Blackwell, Ada">
+      </div>
+      <div class="form-group">
+        <label>Badge color</label>
+        <select id="gf-badge">
+          <option value="badge-cyan">Cyan (flagship)</option>
+          <option value="badge-blue">Blue (mainstream)</option>
+          <option value="badge-orange">Orange (budget)</option>
+          <option value="badge-purple">Purple (workstation)</option>
+          <option value="badge-gray">Gray (other)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeGPUModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGPU()">Save GPU</button>
+    </div>
+  </div>
+</div>
+
+<!-- PART EDIT MODAL -->
+<div class="modal-overlay" id="part-modal">
+  <div class="modal">
+    <div class="modal-title" id="part-modal-title">Add Part</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Category</label>
+        <input type="text" id="pf-cat" placeholder="e.g. GPU, CPU, RAM">
+      </div>
+      <div class="form-group">
+        <label>Part Name</label>
+        <input type="text" id="pf-name" placeholder="e.g. RTX 5090 24GB">
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label>Notes</label>
+        <input type="text" id="pf-notes" placeholder="optional notes">
+      </div>
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" id="pf-qty" value="1" min="1">
+      </div>
+      <div class="form-group">
+        <label>Unit Price ($)</label>
+        <input type="number" id="pf-price" placeholder="0">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePartModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePart()">Save Part</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+const STORE_KEY = 'airig_v2';
+
+const DEFAULT_GPUS = [
+  { id:'g1', name:'RTX 4090', price:1900, vram:24, tdp:700, rate:0.75, gen:'Ada Lovelace', badge:'badge-blue', selected:false },
+  { id:'g2', name:'RTX 5090', price:3999, vram:32, tdp:575, rate:1.30, gen:'Blackwell', badge:'badge-cyan', selected:true },
+  { id:'g3', name:'RTX 4080 Super', price:999, vram:16, tdp:320, rate:0.45, gen:'Ada Lovelace', badge:'badge-orange', selected:false },
+  { id:'g4', name:'RTX 3090 Ti', price:700, vram:24, tdp:450, rate:0.35, gen:'Ampere', badge:'badge-gray', selected:false },
+  { id:'g5', name:'A100 80GB', price:9999, vram:80, tdp:400, rate:2.80, gen:'Ampere Pro', badge:'badge-purple', selected:false },
+];
+
+const DEFAULT_PARTS = [
+  { id:'p1', cat:'GPU (×2)', name:'2× NVIDIA RTX 5090 32GB', notes:'Top Vast.ai demand', qty:1, price:7998 },
+  { id:'p2', cat:'CPU', name:'AMD Ryzen Threadripper 7960X', notes:'24-core, PCIe lanes for dual GPU', qty:1, price:1400 },
+  { id:'p3', cat:'Motherboard', name:'ASUS Pro WS TRX50-SAGE WiFi', notes:'TRX50, dual x16 slots', qty:1, price:800 },
+  { id:'p4', cat:'RAM', name:'128GB DDR5-5600 (4× 32GB)', notes:'ECC, dual channel', qty:1, price:420 },
+  { id:'p5', cat:'Storage (OS)', name:'2TB Samsung 990 Pro NVMe', notes:'Fast model loading', qty:1, price:160 },
+  { id:'p6', cat:'Storage (Data)', name:'4TB WD Black SN850X NVMe', notes:'Dataset scratch', qty:1, price:260 },
+  { id:'p7', cat:'PSU', name:'Corsair AX1600i 1600W Titanium', notes:'Dual 5090 = ~1150W load', qty:1, price:380 },
+  { id:'p8', cat:'Case', name:'Fractal Design Define 7 XL', notes:'Full tower, airflow', qty:1, price:200 },
+  { id:'p9', cat:'Cooling', name:'Noctua NH-U14S TR5-SP6 + fans', notes:'CPU + case airflow', qty:1, price:180 },
+  { id:'p10', cat:'Networking', name:'Intel X550-T1 10GbE NIC', notes:'Required for Vast.ai', qty:1, price:120 },
+  { id:'p11', cat:'Misc', name:'Risers, cables, thermal paste', notes:'', qty:1, price:80 },
+];
+
+let state = load();
+let editingGPUId = null;
+let editingPartId = null;
+
+function load() {
+  try {
+    const s = localStorage.getItem(STORE_KEY);
+    if (s) return JSON.parse(s);
+  } catch(e) {}
+  return { gpus: DEFAULT_GPUS, parts: DEFAULT_PARTS };
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+// ── TABS ───────────────────────────────────────────────────────────────────
+function showTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => { if(t.textContent.toLowerCase().includes(id.substring(0,4))) t.classList.add('active'); });
+  updateAll();
+}
+
+// ── COMPUTED ───────────────────────────────────────────────────────────────
+function selectedGPU() { return state.gpus.find(g => g.selected) || state.gpus[0]; }
+function buildTotal() { return state.parts.reduce((s,p) => s + p.qty * p.price, 0); }
+
+function earnings(gpu, numGpu, rate, util, kwh) {
+  const gross = numGpu * rate * util;
+  const powerKW = (numGpu * gpu.tdp + 100) / 1000;
+  const powerCost = powerKW * kwh;
+  const net = gross - powerCost;
+  const monthly = net * 24 * 30;
+  const yearly = net * 24 * 365;
+  const build = buildTotal();
+  const breakEven = monthly > 0 ? build / monthly : Infinity;
+  return { gross, powerCost, net, monthly, yearly, breakEven, powerKW, build };
+}
+
+// ── MAIN UPDATE ────────────────────────────────────────────────────────────
+function updateAll() {
+  const gpu = selectedGPU();
+  const rate = parseFloat(document.getElementById('d-gpuRate').value);
+  const util = parseFloat(document.getElementById('d-util').value) / 100;
+  const kwh = parseFloat(document.getElementById('d-kwh').value);
+  const numGpu = parseInt(document.getElementById('d-numGpu').value);
+
+  document.getElementById('d-gpuRateOut').textContent = '$' + rate.toFixed(2);
+  document.getElementById('d-utilOut').textContent = Math.round(util * 100) + '%';
+  document.getElementById('d-kwhOut').textContent = '$' + kwh.toFixed(2);
+  document.getElementById('d-numGpuOut').textContent = numGpu;
+
+  const e = earnings(gpu, numGpu, rate, util, kwh);
+
+  // topbar
+  document.getElementById('tb-total').textContent = '$' + e.build.toLocaleString();
+  document.getElementById('tb-month').textContent = '$' + Math.round(e.monthly).toLocaleString();
+  document.getElementById('tb-roi').textContent = isFinite(e.breakEven) ? e.breakEven.toFixed(1) + ' mo' : '∞';
+
+  // dashboard metrics
+  document.getElementById('dash-metrics').innerHTML = `
+    ${metric('Build Cost', '$' + e.build.toLocaleString(), 'total parts', 'blue')}
+    ${metric('Net / Hour', (e.net >= 0 ? '$' : '-$') + Math.abs(e.net).toFixed(2), 'after electricity', e.net >= 0 ? 'green' : 'orange')}
+    ${metric('Monthly Profit', '$' + Math.round(e.monthly).toLocaleString(), '30 day estimate', 'green')}
+    ${metric('Annual Profit', '$' + Math.round(e.yearly).toLocaleString(), '365 day estimate', 'green')}
+    ${metric('Break-even', isFinite(e.breakEven) ? e.breakEven.toFixed(1) + ' mo' : '∞', 'months to ROI', 'purple')}
+    ${metric('Power Draw', e.powerKW.toFixed(2) + ' kW', '$' + (e.powerCost * 24 * 30).toFixed(0) + '/mo electricity', 'orange')}
+  `;
+
+  // GPU display on dashboard
+  document.getElementById('gpu-selected-display').innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+      <div>
+        <div style="font-size:18px; font-weight:600; margin-bottom:2px;">${gpu.name}</div>
+        <div style="font-size:12px; color:var(--text2);">${gpu.gen} · ${gpu.vram}GB VRAM · ${gpu.tdp}W TDP</div>
+      </div>
+      <span class="badge ${gpu.badge}" style="margin-left:auto;">${gpu.gen}</span>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; color:var(--text2);">
+      <div>Price/card: <span style="color:var(--text); font-weight:500;">$${gpu.price.toLocaleString()}</span></div>
+      <div>Est. rate: <span style="color:var(--accent); font-weight:500;">$${gpu.rate.toFixed(2)}/hr</span></div>
+    </div>
+  `;
+
+  // revenue bar chart
+  const grossMonthly = e.gross * 24 * 30;
+  const powerMonthly = e.powerCost * 24 * 30;
+  const netMonthly = e.monthly;
+  const maxBar = Math.max(grossMonthly, 1);
+  document.getElementById('rev-chart').innerHTML = `
+    ${bar('Gross revenue', grossMonthly, maxBar, '', '$' + Math.round(grossMonthly).toLocaleString() + '/mo')}
+    ${bar('Electricity', powerMonthly, maxBar, 'orange', '$' + Math.round(powerMonthly).toLocaleString() + '/mo')}
+    ${bar('Net profit', netMonthly, maxBar, netMonthly < 0 ? 'orange' : '', '$' + Math.round(netMonthly).toLocaleString() + '/mo')}
+    ${bar('Annual', e.yearly, e.yearly, 'blue', '$' + Math.round(e.yearly).toLocaleString())}
+  `;
+
+  // ROI timeline
+  const now = new Date();
+  const months = [3, 6, 12, Math.ceil(e.breakEven)];
+  let tl = '';
+  months.filter((m,i,a) => a.indexOf(m) === i && isFinite(m)).forEach(m => {
+    const d = new Date(now); d.setMonth(d.getMonth() + m);
+    const earned = Math.max(0, e.monthly * m - e.build);
+    const isBE = Math.ceil(e.breakEven) === m;
+    tl += `<div class="tl-item">
+      <div class="tl-dot" style="${isBE ? 'background:var(--warning);' : ''}"></div>
+      <div class="tl-date">${d.toLocaleDateString('en-US', {month:'short', year:'numeric'})} (${m} mo)</div>
+      <div class="tl-event">${isBE ? '🎯 Break-even reached' : earned > 0 ? 'Net profit' : 'Still in payback'}</div>
+      <div class="tl-amt">${earned > 0 ? '+$' + Math.round(earned).toLocaleString() + ' above build cost' : '$' + Math.round(Math.max(0, e.monthly * m)).toLocaleString() + ' earned'}</div>
+    </div>`;
+  });
+  document.getElementById('roi-timeline').innerHTML = tl || '<span style="color:var(--text3);font-size:12px;">Adjust sliders to see timeline</span>';
+
+  // earnings tab
+  renderEarningsTab(gpu, numGpu, rate, util, kwh, e);
+
+  // parts
+  renderParts();
+
+  // gpus
+  renderGPUs();
+}
+
+function metric(label, val, sub, color) {
+  return `<div class="card">
+    <div class="card-title">${label}</div>
+    <div class="metric-val ${color}">${val}</div>
+    <div class="metric-sub">${sub}</div>
+  </div>`;
+}
+
+function bar(label, val, max, cls, display) {
+  const pct = Math.max(0, Math.min(100, (val / max) * 100));
+  return `<div class="bar-row">
+    <span class="bar-label">${label}</span>
+    <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
+    <span class="bar-val">${display}</span>
+  </div>`;
+}
+
+// ── EARNINGS TAB ───────────────────────────────────────────────────────────
+function renderEarningsTab(gpu, numGpu, rate, util, kwh, e) {
+  document.getElementById('earnings-metrics').innerHTML = `
+    ${metric('Gross / Hr', '$' + e.gross.toFixed(2), numGpu + '× ' + gpu.name, 'blue')}
+    ${metric('Power / Hr', '$' + e.powerCost.toFixed(2), e.powerKW.toFixed(2) + 'kW @ $' + kwh.toFixed(2) + '/kWh', 'orange')}
+    ${metric('Net / Hr', (e.net >= 0 ? '$' : '-$') + Math.abs(e.net).toFixed(2), 'after electricity', e.net >= 0 ? 'green' : 'orange')}
+  `;
+
+  const rates = [0.50, 0.75, 1.00, 1.25, 1.50, 1.75, 2.00, 2.50, 3.00];
+  const maxM = Math.max(...rates.map(r => earnings(gpu, numGpu, r, util, kwh).monthly));
+  document.getElementById('rate-chart').innerHTML = rates.map(r => {
+    const em = earnings(gpu, numGpu, r, util, kwh);
+    return bar('$' + r.toFixed(2) + '/hr', em.monthly, maxM, r === rate ? '' : 'blue', '$' + Math.round(em.monthly).toLocaleString() + '/mo');
+  }).join('');
+
+  const beDetail = isFinite(e.breakEven) ? `
+    <div style="margin-bottom:16px;">
+      <div class="metric-val green">${e.breakEven.toFixed(1)} <span style="font-size:16px; color:var(--text2);">months</span></div>
+      <div class="metric-sub">to recover $${e.build.toLocaleString()} build cost</div>
+    </div>
+    <div style="font-size:13px; color:var(--text2); line-height:1.9;">
+      <div>Monthly income: <span style="color:var(--text);">$${Math.round(e.monthly).toLocaleString()}</span></div>
+      <div>Days to break-even: <span style="color:var(--text);">${Math.round(e.breakEven * 30)}</span></div>
+      <div>Year 1 total earned: <span style="color:var(--accent);">$${Math.round(e.monthly * 12).toLocaleString()}</span></div>
+      <div>Year 2 total earned: <span style="color:var(--accent);">$${Math.round(e.monthly * 24).toLocaleString()}</span></div>
+      <div>Year 1 net (after build): <span style="${e.monthly * 12 > e.build ? 'color:var(--success)' : 'color:var(--danger)'};">$${Math.round(e.monthly * 12 - e.build).toLocaleString()}</span></div>
+    </div>
+  ` : `<div class="metric-val orange">∞</div><div class="metric-sub">Not profitable at current settings — raise rate or lower electricity cost.</div>`;
+  document.getElementById('breakeven-detail').innerHTML = beDetail;
+}
+
+// ── PARTS TABLE ────────────────────────────────────────────────────────────
+function renderParts() {
+  const tbody = document.getElementById('parts-body');
+  tbody.innerHTML = state.parts.map(p => `
+    <tr>
+      <td><span class="tag">${p.cat}</span></td>
+      <td style="font-weight:500;">${p.name}</td>
+      <td style="color:var(--text2); font-size:12px;">${p.notes || '—'}</td>
+      <td style="font-family:var(--mono);">${p.qty}</td>
+      <td class="price-cell">$${p.price.toLocaleString()}</td>
+      <td class="price-cell">$${(p.qty * p.price).toLocaleString()}</td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick="editPart('${p.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePart('${p.id}')">✕</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('parts-total').textContent = '$' + buildTotal().toLocaleString();
+}
+
+function addPart() {
+  editingPartId = null;
+  document.getElementById('part-modal-title').textContent = 'Add Part';
+  ['pf-cat','pf-name','pf-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pf-qty').value = 1;
+  document.getElementById('pf-price').value = '';
+  document.getElementById('part-modal').classList.add('open');
+}
+
+function editPart(id) {
+  editingPartId = id;
+  const p = state.parts.find(x => x.id === id);
+  document.getElementById('part-modal-title').textContent = 'Edit Part';
+  document.getElementById('pf-cat').value = p.cat;
+  document.getElementById('pf-name').value = p.name;
+  document.getElementById('pf-notes').value = p.notes || '';
+  document.getElementById('pf-qty').value = p.qty;
+  document.getElementById('pf-price').value = p.price;
+  document.getElementById('part-modal').classList.add('open');
+}
+
+function savePart() {
+  const cat = document.getElementById('pf-cat').value.trim();
+  const name = document.getElementById('pf-name').value.trim();
+  const notes = document.getElementById('pf-notes').value.trim();
+  const qty = parseInt(document.getElementById('pf-qty').value) || 1;
+  const price = parseFloat(document.getElementById('pf-price').value) || 0;
+  if (!name) return;
+  if (editingPartId) {
+    const p = state.parts.find(x => x.id === editingPartId);
+    Object.assign(p, { cat, name, notes, qty, price });
+  } else {
+    state.parts.push({ id: 'p' + Date.now(), cat, name, notes, qty, price });
+  }
+  save(); closePartModal(); updateAll();
+}
+
+function deletePart(id) {
+  state.parts = state.parts.filter(p => p.id !== id);
+  save(); updateAll();
+}
+
+function closePartModal() { document.getElementById('part-modal').classList.remove('open'); }
+
+// ── GPU MANAGER ────────────────────────────────────────────────────────────
+function renderGPUs() {
+  document.getElementById('gpu-cards').innerHTML = state.gpus.map(g => `
+    <div class="gpu-compare-card ${g.selected ? 'selected' : ''}" onclick="selectGPU('${g.id}')">
+      <div class="selected-mark">✓</div>
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
+        <span class="badge ${g.badge}">${g.gen}</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); openEditGPU('${g.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteGPU('${g.id}')">✕</button>
+        </div>
+      </div>
+      <div class="gpu-name">${g.name}</div>
+      <div class="gpu-price">$${g.price.toLocaleString()}</div>
+      <div class="gpu-stat"><span>VRAM</span><span>${g.vram}GB</span></div>
+      <div class="gpu-stat"><span>TDP</span><span>${g.tdp}W</span></div>
+      <div class="gpu-stat"><span>Est. Vast rate</span><span style="color:var(--accent);">$${g.rate.toFixed(2)}/hr</span></div>
+    </div>
+  `).join('');
+
+  // GPU comparison bars
+  const maxPrice = Math.max(...state.gpus.map(g => g.price));
+  const maxVram = Math.max(...state.gpus.map(g => g.vram));
+  const maxRate = Math.max(...state.gpus.map(g => g.rate));
+  document.getElementById('gpu-compare-chart').innerHTML = `
+    <div style="font-size:11px; color:var(--text3); margin-bottom:8px; font-family:var(--mono);">PRICE</div>
+    ${state.gpus.map(g => bar(g.name, g.price, maxPrice, g.selected ? '' : 'blue', '$' + g.price.toLocaleString())).join('')}
+    <div style="font-size:11px; color:var(--text3); margin: 14px 0 8px; font-family:var(--mono);">VRAM</div>
+    ${state.gpus.map(g => bar(g.name, g.vram, maxVram, g.selected ? '' : 'purple', g.vram + 'GB')).join('')}
+    <div style="font-size:11px; color:var(--text3); margin: 14px 0 8px; font-family:var(--mono);">VAST.AI RATE</div>
+    ${state.gpus.map(g => bar(g.name, g.rate, maxRate, g.selected ? '' : 'orange', '$' + g.rate.toFixed(2) + '/hr')).join('')}
+  `;
+}
+
+function selectGPU(id) {
+  state.gpus.forEach(g => g.selected = g.id === id);
+  save(); updateAll();
+}
+
+function openAddGPU() {
+  editingGPUId = null;
+  document.getElementById('gpu-modal-title').textContent = 'Add GPU';
+  ['gf-name','gf-price','gf-vram','gf-tdp','gf-rate','gf-gen'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('gpu-modal').classList.add('open');
+}
+
+function openEditGPU(id) {
+  editingGPUId = id;
+  const g = state.gpus.find(x => x.id === id);
+  document.getElementById('gpu-modal-title').textContent = 'Edit GPU';
+  document.getElementById('gf-name').value = g.name;
+  document.getElementById('gf-price').value = g.price;
+  document.getElementById('gf-vram').value = g.vram;
+  document.getElementById('gf-tdp').value = g.tdp;
+  document.getElementById('gf-rate').value = g.rate;
+  document.getElementById('gf-gen').value = g.gen;
+  document.getElementById('gf-badge').value = g.badge;
+  document.getElementById('gpu-modal').classList.add('open');
+}
+
+function saveGPU() {
+  const name = document.getElementById('gf-name').value.trim();
+  if (!name) return;
+  const data = {
+    name,
+    price: parseFloat(document.getElementById('gf-price').value) || 0,
+    vram: parseInt(document.getElementById('gf-vram').value) || 0,
+    tdp: parseInt(document.getElementById('gf-tdp').value) || 300,
+    rate: parseFloat(document.getElementById('gf-rate').value) || 0.50,
+    gen: document.getElementById('gf-gen').value.trim() || 'Unknown',
+    badge: document.getElementById('gf-badge').value,
+  };
+  if (editingGPUId) {
+    Object.assign(state.gpus.find(g => g.id === editingGPUId), data);
+  } else {
+    state.gpus.push({ id: 'g' + Date.now(), selected: false, ...data });
+  }
+  save(); closeGPUModal(); updateAll();
+}
+
+function deleteGPU(id) {
+  if (state.gpus.length <= 1) return;
+  state.gpus = state.gpus.filter(g => g.id !== id);
+  if (!state.gpus.find(g => g.selected)) state.gpus[0].selected = true;
+  save(); updateAll();
+}
+
+function closeGPUModal() { document.getElementById('gpu-modal').classList.remove('open'); }
+
+// ── IMPORT / EXPORT ────────────────────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ai-rig-build.json';
+  a.click();
+}
+
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.gpus && data.parts) { state = data; save(); updateAll(); }
+      } catch(err) { alert('Invalid JSON file.'); }
+    };
+    r.readAsText(f);
+  };
+  input.click();
+}
+
+// close modals on overlay click
+document.getElementById('gpu-modal').addEventListener('click', function(e) { if(e.target===this) closeGPUModal(); });
+document.getElementById('part-modal').addEventListener('click', function(e) { if(e.target===this) closePartModal(); });
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+// sync slider defaults to selected GPU rate
+window.addEventListener('load', () => {
+  const gpu = selectedGPU();
+  document.getElementById('d-gpuRate').value = gpu.rate;
+  updateAll();
+});
+</script>
+</body>
+</html>
