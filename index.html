@@ -464,7 +464,26 @@ async function loadFromDB(){
 }
 function persist(){
   localStorage.setItem(SK,JSON.stringify(S));
-  db.from('dashboard_state').upsert({id:STATE_ID,state:S,updated_at:new Date().toISOString()});
+  db.from('dashboard_state')
+    .upsert({id:STATE_ID,state:S,updated_at:new Date().toISOString()})
+    .then(({error})=>{
+      if(error){
+        console.error('Supabase save error:',error);
+        showDBError(error.message);
+      }
+    });
+}
+function showDBError(msg){
+  let el=document.getElementById('db-error');
+  if(!el){
+    el=document.createElement('div');
+    el.id='db-error';
+    el.style.cssText='position:fixed;bottom:16px;right:16px;background:#7f1d1d;color:#fca5a5;padding:10px 14px;border-radius:6px;font-size:12px;font-family:var(--mono);z-index:9999;max-width:340px;';
+    document.body.appendChild(el);
+  }
+  el.textContent='DB error: '+msg;
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.remove(),6000);
 }
 function buildById(id){return S.builds.find(b=>b.id===id)||S.builds[0];}
 function gpuById(id){return S.gpus.find(g=>g.id===id)||S.gpus[0];}
@@ -547,13 +566,10 @@ function renderDashPills(){
 
 function setDash(bid){dashBid=bid;updateAll();}
 
-function renderDash(){
+function renderDashMetrics(){
   const e=calc(dashBid);
   const b=e.b;
   const col=pc(b.color).hex;
-
-  document.getElementById('dash-build-name').textContent=b.name;
-  document.getElementById('dash-build-name').style.color=col;
 
   document.getElementById('dash-metrics').innerHTML=[
     mc('Build Cost',f$(e.cost),'total parts','mv-blue'),
@@ -575,18 +591,6 @@ function renderDash(){
       <span class="badge ${e.g.badge}" style="margin-left:auto;">${e.g.gen}</span>
     </div>`;
 
-  document.getElementById('dash-sliders').innerHTML=
-    sHtml('d-rate','Price / GPU / hr',0.05,3.00,0.05,b.rate,col,'$',2)+
-    sHtml('d-util','Utilization %',10,100,5,b.util,col,'','0','%')+
-    sHtml('d-kwh','Electricity $/kWh',0.06,0.42,0.01,b.kwh,col,'$',2)+
-    sHtml('d-ngpu','Number of GPUs',1,8,1,b.numGpu,col,'','0');
-
-  const bid=dashBid;
-  document.getElementById('d-rate').oninput=ev=>{buildById(bid).rate=parseFloat(ev.target.value);persist();updateAll();};
-  document.getElementById('d-util').oninput=ev=>{buildById(bid).util=parseInt(ev.target.value);persist();updateAll();};
-  document.getElementById('d-kwh').oninput=ev=>{buildById(bid).kwh=parseFloat(ev.target.value);persist();updateAll();};
-  document.getElementById('d-ngpu').oninput=ev=>{buildById(bid).numGpu=parseInt(ev.target.value);persist();updateAll();};
-
   const gm=e.gross*24*30, pm=e.pcost*24*30, nm=e.mo;
   const mx=Math.max(gm,1);
   document.getElementById('rev-chart').innerHTML=[
@@ -597,10 +601,10 @@ function renderDash(){
   ].join('');
 
   const now=new Date();
-  const pts=[...new Set([3,6,12,isFinite(e.be)?Math.ceil(e.be):null].filter(Boolean))];
+  const pts=[...new Set([3,6,12,e.be!==null?Math.ceil(e.be):null].filter(Boolean))];
   document.getElementById('roi-tl').innerHTML=pts.map(m=>{
     const d=new Date(now);d.setMonth(d.getMonth()+m);
-    const earned=e.mo*m, isBE=isFinite(e.be)&&Math.ceil(e.be)===m;
+    const earned=e.mo*m, isBE=e.be!==null&&Math.ceil(e.be)===m;
     const c=isBE?'var(--warning)':col;
     return`<div class="tl-item"><div class="tl-dot" style="background:${c};"></div>
       <div class="tl-date">${d.toLocaleDateString('en-US',{month:'short',year:'numeric'})} (${m} mo)</div>
@@ -608,6 +612,33 @@ function renderDash(){
       <div class="tl-amt" style="color:${c};">${f$(earned)} earned · ${f$(Math.max(0,earned-e.cost))} net</div>
     </div>`;
   }).join('')||'<span style="color:var(--text3);font-size:12px;">Adjust sliders above</span>';
+}
+
+function renderDash(){
+  const e=calc(dashBid);
+  const b=e.b;
+  const col=pc(b.color).hex;
+
+  document.getElementById('dash-build-name').textContent=b.name;
+  document.getElementById('dash-build-name').style.color=col;
+
+  renderDashMetrics();
+
+  document.getElementById('dash-sliders').innerHTML=
+    sHtml('d-rate','Price / GPU / hr',0.05,3.00,0.05,b.rate,col,'$',2)+
+    sHtml('d-util','Utilization %',10,100,5,b.util,col,'','0','%')+
+    sHtml('d-kwh','Electricity $/kWh',0.00,0.70,0.01,b.kwh,col,'$',2)+
+    sHtml('d-ngpu','Number of GPUs',1,8,1,b.numGpu,col,'','0');
+
+  const bid=dashBid;
+  document.getElementById('d-rate').oninput=ev=>{buildById(bid).rate=parseFloat(ev.target.value);document.getElementById('d-rate-out').textContent='$'+parseFloat(ev.target.value).toFixed(2);renderDashMetrics();};
+  document.getElementById('d-rate').onchange=ev=>{persist();updateAll();};
+  document.getElementById('d-util').oninput=ev=>{buildById(bid).util=parseInt(ev.target.value);document.getElementById('d-util-out').textContent=parseInt(ev.target.value)+'%';renderDashMetrics();};
+  document.getElementById('d-util').onchange=ev=>{persist();updateAll();};
+  document.getElementById('d-kwh').oninput=ev=>{buildById(bid).kwh=parseFloat(ev.target.value);document.getElementById('d-kwh-out').textContent='$'+parseFloat(ev.target.value).toFixed(2);renderDashMetrics();};
+  document.getElementById('d-kwh').onchange=ev=>{persist();updateAll();};
+  document.getElementById('d-ngpu').oninput=ev=>{buildById(bid).numGpu=parseInt(ev.target.value);document.getElementById('d-ngpu-out').textContent=parseInt(ev.target.value);renderDashMetrics();};
+  document.getElementById('d-ngpu').onchange=ev=>{persist();updateAll();};
 }
 
 function sHtml(id,label,min,max,step,val,col,pre='',dec='0',suf=''){
