@@ -1095,7 +1095,40 @@ function expJSON(bid){
 }
 function impJSON(bid){
   const inp=document.createElement('input');inp.type='file';inp.accept='.json';
-  inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.build&&d.build.parts){Object.assign(buildById(bid),d.build);if(d.gpus)S.gpus=d.gpus;persist();updateAll();}}catch{alert('Invalid JSON.');}};r.readAsText(f);};
+  inp.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        const target=buildById(bid);
+        // Original app export format
+        if(d.build&&d.build.parts){
+          Object.assign(target,d.build);
+          if(d.gpus)S.gpus=d.gpus;
+          persist();updateAll();return;
+        }
+        // External format: { builds: [{ name, parts: [{ category, part, unit, ... }] }] }
+        if(d.builds&&Array.isArray(d.builds)&&d.builds.length>0){
+          const src=d.builds[0];
+          if(src.name)target.name=src.name;
+          if(Array.isArray(src.parts)){
+            target.parts=src.parts.map((p,i)=>({
+              id:'p'+Date.now()+i,
+              cat:p.category||p.cat||'Misc',
+              name:p.part||p.name||'Unknown Part',
+              notes:p.notes||'',
+              qty:p.qty||1,
+              price:p.unit||p.price||0
+            }));
+          }
+          persist();updateAll();return;
+        }
+        alert('Unrecognized JSON format.');
+      }catch{alert('Invalid JSON.');}
+    };
+    r.readAsText(f);
+  };
   inp.click();
 }
 
