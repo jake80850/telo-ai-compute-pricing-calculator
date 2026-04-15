@@ -1005,6 +1005,7 @@ function renderEarnings(){
   // ── PER-SCENARIO CARDS (sliding carousel, always 4 visible, 1 step at a time) ──
   const maxPage=Math.max(0,snaps.length-4);
   earnPage=Math.min(earnPage,maxPage);
+  const canScroll=snaps.length>4;
   // pad to at least 4 total items with ghost cards
   const ghostCount=Math.max(0,4-snaps.length);
   const ghostCard=`<div style="flex:0 0 calc(25% - 9px);background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;">
@@ -1061,20 +1062,20 @@ function renderEarnings(){
       <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">${Math.round(sn.rate*100)}¢/hr · ${sn.util}% util · $${sn.kwh.toFixed(2)}/kWh</div>
     </div>`;
   };
-  const arrowStyle=(id,disabled)=>`id="${id}" onclick="earnNav(${id==='earn-prev'?-1:1})" style="flex-shrink:0;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,${disabled?.06:.18});background:${disabled?'transparent':'var(--bg3)'};color:var(--text);font-size:22px;cursor:${disabled?'default':'pointer'};display:flex;align-items:center;justify-content:center;transition:all .2s;opacity:${disabled?.25:1};align-self:center;"`;
-  const dots=maxPage>0?`<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:12px;">
+  const arrowBtn=(id,disabled)=>`<button id="${id}" onclick="earnNav(${id==='earn-prev'?-1:1})" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,${disabled?'.06':'.22'});background:${disabled?'transparent':'var(--bg3)'};color:var(--text);font-size:26px;cursor:${disabled?'default':'pointer'};display:flex;align-items:center;justify-content:center;transition:all .2s;opacity:${disabled?'.3':'1'};align-self:center;padding-bottom:2px;">${id==='earn-prev'?'&#8249;':'&#8250;'}</button>`;
+  const dots=canScroll?`<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:12px;">
     ${Array.from({length:maxPage+1},(_,i)=>`<div class="earn-dot" style="width:${i===earnPage?16:6}px;height:6px;border-radius:3px;background:${i===earnPage?'var(--cyan)':'rgba(255,255,255,0.15)'};transition:all .25s;"></div>`).join('')}
     <span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:6px;">${earnPage+1} / ${maxPage+1}</span>
   </div>`:'';
   const cards=`<div style="margin-bottom:22px;">
     <div style="display:flex;align-items:stretch;gap:10px;">
-      <button ${arrowStyle('earn-prev',earnPage===0)}>&#8249;</button>
+      ${canScroll?arrowBtn('earn-prev',earnPage===0):''}
       <div id="earn-carousel-wrap" style="flex:1;overflow:hidden;min-width:0;">
         <div id="earn-track" style="display:flex;gap:12px;transition:transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94);will-change:transform;">
           ${snaps.map(snapCardHtml).join('')}${Array(ghostCount).fill(ghostCard).join('')}
         </div>
       </div>
-      <button ${arrowStyle('earn-next',earnPage>=maxPage)}>&#8250;</button>
+      ${canScroll?arrowBtn('earn-next',earnPage>=maxPage):''}
     </div>
     ${dots}
   </div>`;
@@ -1093,6 +1094,19 @@ function renderEarnings(){
 
   document.getElementById('earn-snap-cards').innerHTML=summary+cards;
   document.getElementById('earn-be-cards').innerHTML=bars;
+  // Restore carousel scroll position after DOM rebuild
+  if(earnPage>0){
+    requestAnimationFrame(()=>{
+      const wrap=document.getElementById('earn-carousel-wrap');
+      const track=document.getElementById('earn-track');
+      if(wrap&&track){
+        const step=wrap.offsetWidth/4+3;
+        track.style.transition='none';
+        track.style.transform=`translateX(-${earnPage*step}px)`;
+        requestAnimationFrame(()=>{if(track)track.style.transition='transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)';});
+      }
+    });
+  }
 
   // ── RECOMMENDATION ──
   // Score each snapshot: 40% monthly income, 40% ROI speed, 20% capital efficiency
