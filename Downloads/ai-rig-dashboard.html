@@ -717,10 +717,13 @@ function renderEarningsTab(gpu, numGpu, rate, util, kwh, e) {
   }).join('');
 
   const beDetail = isFinite(e.breakEven) ? `
-    <div style="margin-bottom:16px;">
-      <div class="metric-val green">${e.breakEven.toFixed(1)} <span style="font-size:16px; color:var(--text2);">months</span></div>
-      <div class="metric-sub">to recover $${e.build.toLocaleString()} build cost</div>
+    <div style="display:flex;align-items:baseline;gap:18px;margin-bottom:4px;">
+      <div class="metric-val purple">${e.breakEven.toFixed(1)} <span style="font-size:16px;color:var(--text2);">mo</span></div>
+      <div style="color:rgba(255,255,255,0.12);font-size:22px;font-weight:300;">|</div>
+      <div class="metric-val purple">${(e.breakEven/12).toFixed(1)} <span style="font-size:16px;color:var(--text2);">yr</span></div>
     </div>
+    <div class="metric-sub" style="margin-bottom:12px;">to recover $${e.build.toLocaleString()} build cost</div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin-bottom:12px;">
     <div style="font-size:13px; color:var(--text2); line-height:1.9;">
       <div>Monthly income: <span style="color:var(--text);">$${Math.round(e.monthly).toLocaleString()}</span></div>
       <div>Days to break-even: <span style="color:var(--text);">${Math.round(e.breakEven * 30)}</span></div>
