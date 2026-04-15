@@ -161,6 +161,18 @@ textarea::placeholder{color:var(--text3);}
 .color-swatch.selected{border-color:var(--text);}
 
 @media(max-width:768px){.g3{grid-template-columns:1fr;}.g2{grid-template-columns:1fr;}}
+@media(max-width:640px){
+  /* Parts list */
+  #parts-content .sec-hdr{flex-direction:column;align-items:flex-start;gap:8px;}
+  #parts-content .sec-hdr div{flex-wrap:wrap;gap:6px;}
+  #parts-content .card{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  #parts-content .dt{min-width:440px;}
+  /* Earnings carousel — 1 card wide on mobile */
+  #earn-track .card{flex:0 0 100%!important;}
+  #earn-track>div[style*="dashed"]{display:none!important;}
+  /* Earnings recommendation — stack columns */
+  .earn-rec-grid{grid-template-columns:1fr!important;}
+}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes earn-in-r{from{opacity:0;transform:translateX(52px)}to{opacity:1;transform:translateX(0)}}
 @keyframes earn-in-l{from{opacity:0;transform:translateX(-52px)}to{opacity:1;transform:translateX(0)}}
@@ -437,12 +449,15 @@ let partsBid=S.builds[0].id;
 let earnPage=0;
 // Context shared between renderEarnings and earnNav
 let _earnSnaps=[],_earnBestMo=null,_earnBestBE=null,_earnMaxMo=1;
-function _earnCardHtml(sn){
+function _earnVisCount(){return window.innerWidth<640?1:4;}
+function _earnCardHtml(sn,cols){
+  cols=cols||4;
+  const cardW=cols===1?'100%':`calc(${(100/cols).toFixed(1)}% - ${Math.round((cols-1)*12/cols)}px)`;
   const col=pc(sn.buildColor||'cyan').hex;
   const isBestMo=_earnBestMo&&sn.id===_earnBestMo.id;
   const isBestBE=_earnBestBE&&sn.id===_earnBestBE.id;
   const moPct=Math.min(100,(sn.monthly/_earnMaxMo)*100);
-  return`<div class="card" style="flex:0 0 calc(25% - 9px);border-top:2px solid ${col};padding-top:14px;box-sizing:border-box;">
+  return`<div class="card" style="flex:0 0 ${cardW};border-top:2px solid ${col};padding-top:14px;box-sizing:border-box;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
       <div style="min-width:0;">
         <div style="font-weight:600;font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sn.name}</div>
@@ -491,11 +506,13 @@ function earnNav(dir){
   const track=document.getElementById('earn-track');
   const counter=document.getElementById('earn-counter');
   if(!track)return;
-  const visCount=Math.min(4,_earnSnaps.length);
-  const ghostCount=Math.max(0,4-_earnSnaps.length);
-  const ghostHtml=`<div style="flex:0 0 calc(25% - 9px);background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;"><div style="text-align:center;color:var(--text3);"><div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div><div style="font-size:11px;">Save snapshot</div></div></div>`;
+  const cols=_earnVisCount();
+  const visCount=Math.min(cols,_earnSnaps.length);
+  const ghostCount=cols===1?0:Math.max(0,cols-_earnSnaps.length);
+  const ghostW=cols===1?'100%':'calc(25% - 9px)';
+  const ghostHtml=`<div style="flex:0 0 ${ghostW};background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;"><div style="text-align:center;color:var(--text3);"><div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div><div style="font-size:11px;">Save snapshot</div></div></div>`;
   const vis=Array.from({length:visCount},(_,i)=>_earnSnaps[(earnPage+i)%_earnSnaps.length]);
-  track.innerHTML=vis.map(_earnCardHtml).join('')+ghostHtml.repeat(ghostCount);
+  track.innerHTML=vis.map(sn=>_earnCardHtml(sn,cols)).join('')+ghostHtml.repeat(ghostCount);
   track.classList.remove('earn-anim-r','earn-anim-l');
   track.offsetHeight;
   track.classList.add(dir>=0?'earn-anim-r':'earn-anim-l');
@@ -1061,9 +1078,11 @@ function renderEarnings(){
   earnPage=((earnPage%snaps.length)+snaps.length)%snaps.length;
   _earnSnaps=snaps; _earnBestMo=bestMo; _earnBestBE=bestBE; _earnMaxMo=maxMo;
 
-  const visCount=Math.min(4,snaps.length);
-  const ghostCount=Math.max(0,4-snaps.length);
-  const ghostHtml=`<div style="flex:0 0 calc(25% - 9px);background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;"><div style="text-align:center;color:var(--text3);"><div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div><div style="font-size:11px;">Save snapshot</div></div></div>`;
+  const cols=_earnVisCount();
+  const visCount=Math.min(cols,snaps.length);
+  const ghostCount=cols===1?0:Math.max(0,cols-snaps.length);
+  const ghostW=cols===1?'100%':'calc(25% - 9px)';
+  const ghostHtml=`<div style="flex:0 0 ${ghostW};background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;"><div style="text-align:center;color:var(--text3);"><div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div><div style="font-size:11px;">Save snapshot</div></div></div>`;
   const vis=Array.from({length:visCount},(_,i)=>snaps[(earnPage+i)%snaps.length]);
   const arrowBtn=id=>`<button onclick="earnNav(${id==='earn-prev'?-1:1})" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:var(--bg3);color:var(--text);font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;align-self:center;padding-bottom:2px;">${id==='earn-prev'?'&#8249;':'&#8250;'}</button>`;
   const hasMultiple=snaps.length>1;
@@ -1076,7 +1095,7 @@ function renderEarnings(){
       ${hasMultiple?arrowBtn('earn-prev'):''}
       <div style="flex:1;min-width:0;">
         <div id="earn-track" style="display:flex;gap:12px;">
-          ${vis.map(_earnCardHtml).join('')}${ghostHtml.repeat(ghostCount)}
+          ${vis.map(sn=>_earnCardHtml(sn,cols)).join('')}${ghostHtml.repeat(ghostCount)}
         </div>
       </div>
       ${hasMultiple?arrowBtn('earn-next'):''}
@@ -1148,7 +1167,7 @@ function renderEarnings(){
         <span style="font-family:var(--mono);font-size:9px;letter-spacing:.15em;background:${recCol};color:#000;padding:3px 8px;border-radius:3px;font-weight:700;">RECOMMENDED</span>
         <span style="font-size:11px;color:var(--text3);">scored across income · ROI speed · capital efficiency</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="earn-rec-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
         <div>
           <div style="font-size:22px;font-weight:700;margin-bottom:4px;">${rec.name}</div>
           <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:18px;">${rec.buildName} &nbsp;·&nbsp; ${rec.gpuName} ×${rec.numGpu}</div>
