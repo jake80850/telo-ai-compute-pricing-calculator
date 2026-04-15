@@ -946,57 +946,109 @@ function cm2(label,va,vb,nameA,nameB,winCol,loseCol,hint){
 // ─────────────────────────────────────────────────────────────────────────────
 function renderEarnings(){
   const snaps=S.snapshots||[];
-  const empty=`<div style="text-align:center;padding:60px 20px;color:var(--text3);">
-    <div style="font-size:28px;opacity:.3;margin-bottom:10px;">⬡</div>
-    <div style="font-size:14px;color:var(--text2);margin-bottom:4px;">No snapshots yet</div>
-    <div style="font-size:12px;">Save a snapshot on the Snapshots tab to see earnings analysis here.</div>
-  </div>`;
   if(!snaps.length){
-    document.getElementById('earn-snap-cards').innerHTML=empty;
+    document.getElementById('earn-snap-cards').innerHTML=`<div style="text-align:center;padding:60px 20px;"><div style="font-size:28px;opacity:.3;margin-bottom:10px;">⬡</div><div style="font-size:14px;color:var(--text2);margin-bottom:4px;">No snapshots yet</div><div style="font-size:12px;color:var(--text3);">Save snapshots on the Snapshots tab to compare scenarios here.</div></div>`;
     document.getElementById('earn-be-cards').innerHTML='';
     return;
   }
 
-  // Income cards — monthly + yearly side by side
-  document.getElementById('earn-snap-cards').innerHTML=`
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;">
-      ${snaps.map(sn=>{
-        const col=pc(sn.buildColor||'cyan').hex;
-        return`<div class="card">
-          <div class="card-title">${sn.name}</div>
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">${sn.buildName} · ${sn.gpuName} ×${sn.numGpu}</div>
-          <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:4px;">
-            <div><div class="mv" style="color:${col};">${f$(sn.monthly)}<span style="font-size:13px;color:var(--text3);margin-left:3px;">/mo</span></div></div>
-            <div style="color:rgba(255,255,255,0.12);font-size:20px;font-weight:300;">|</div>
-            <div><div class="mv" style="color:${col};">${sn.yr!==null?f$(sn.yr):'—'}<span style="font-size:13px;color:var(--text3);margin-left:3px;">/yr</span></div></div>
-          </div>
-          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0;">
-          <div style="font-size:12px;color:var(--text2);">${Math.round(sn.rate*100)}¢/hr · ${sn.util}% util · $${sn.kwh.toFixed(2)}/kWh</div>
-        </div>`;
-      }).join('')}
-    </div>`;
+  const profitable=snaps.filter(s=>s.monthly>0);
+  const bestMo=profitable.length?profitable.reduce((a,b)=>a.monthly>b.monthly?a:b):null;
+  const bestBE=snaps.filter(s=>s.breakEven!==null).reduce((a,b)=>a===null||b.breakEven<a.breakEven?b:a,null);
+  const totalInvested=snaps.reduce((s,n)=>s+(n.buildCost||0),0);
+  const maxMo=Math.max(...snaps.map(s=>s.monthly||0),1);
+  const maxBE=Math.max(...snaps.filter(s=>s.breakEven!==null).map(s=>s.breakEven),1);
 
-  // Break-even cards
-  document.getElementById('earn-be-cards').innerHTML=`
-    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">Break-even Analysis</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
-      ${snaps.map(sn=>{
-        return sn.breakEven!==null?`<div class="card">
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">${sn.name}</div>
-          <div style="display:flex;align-items:baseline;gap:14px;">
-            <div class="mv mv-purple">${sn.breakEven.toFixed(1)}<span style="font-size:15px;color:var(--text2);margin-left:3px;">mo</span></div>
-            <div style="color:rgba(255,255,255,0.12);font-size:20px;font-weight:300;">|</div>
-            <div class="mv mv-purple">${(sn.breakEven/12).toFixed(1)}<span style="font-size:15px;color:var(--text2);margin-left:3px;">yr</span></div>
+  // ── SUMMARY STRIP ──
+  const summary=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px;">
+    <div class="card" style="padding:12px 14px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">Scenarios</div>
+      <div class="mv mv-cyan" style="font-size:22px;">${snaps.length}</div>
+      <div class="metric-sub">builds compared</div>
+    </div>
+    ${bestMo?`<div class="card" style="padding:12px 14px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">Top Monthly</div>
+      <div class="mv mv-cyan" style="font-size:22px;">${f$(bestMo.monthly)}</div>
+      <div class="metric-sub">${bestMo.name}</div>
+    </div>`:''}
+    ${bestBE?`<div class="card" style="padding:12px 14px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">Fastest ROI</div>
+      <div class="mv mv-purple" style="font-size:22px;">${bestBE.breakEven.toFixed(1)} <span style="font-size:13px;color:var(--text2);">mo</span></div>
+      <div class="metric-sub">${bestBE.name}</div>
+    </div>`:''}
+    <div class="card" style="padding:12px 14px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">Total Invested</div>
+      <div class="mv mv-blue" style="font-size:22px;">${f$(totalInvested)}</div>
+      <div class="metric-sub">across all builds</div>
+    </div>
+  </div>`;
+
+  // ── PER-SCENARIO CARDS ──
+  const cards=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-bottom:22px;">
+    ${snaps.map(sn=>{
+      const col=pc(sn.buildColor||'cyan').hex;
+      const isBestMo=bestMo&&sn.id===bestMo.id;
+      const isBestBE=bestBE&&sn.id===bestBE.id;
+      const moPct=Math.min(100,(sn.monthly/maxMo)*100);
+      return`<div class="card" style="border-top:2px solid ${col};padding-top:14px;position:relative;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+          <div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:3px;">${sn.name}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">${sn.buildName} &nbsp;·&nbsp; ${sn.gpuName} ×${sn.numGpu}</div>
           </div>
-          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0 6px;">
-          <div class="metric-sub">to recover ${f$(sn.buildCost)}</div>
-        </div>`:`<div class="card">
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">${sn.name}</div>
-          <div class="mv mv-orange">∞</div>
-          <div class="metric-sub">not profitable at this rate</div>
-        </div>`;
-      }).join('')}
-    </div>`;
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+            ${isBestMo?`<span style="font-size:9px;font-family:var(--mono);background:${col}22;color:${col};border:1px solid ${col}55;border-radius:3px;padding:2px 5px;white-space:nowrap;">TOP INCOME</span>`:''}
+            ${isBestBE?`<span style="font-size:9px;font-family:var(--mono);background:rgba(139,92,246,.15);color:var(--purple);border:1px solid rgba(139,92,246,.35);border-radius:3px;padding:2px 5px;white-space:nowrap;">FASTEST ROI</span>`:''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:6px;">
+          <div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:2px;">MONTHLY</div>
+            <div class="mv" style="color:${col};font-size:24px;">${f$(sn.monthly)}</div>
+          </div>
+          <div style="color:rgba(255,255,255,0.1);font-size:18px;font-weight:300;padding-top:16px;">|</div>
+          <div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:2px;">YEARLY</div>
+            <div class="mv" style="color:${col};font-size:24px;">${sn.yr!==null?f$(sn.yr):'—'}</div>
+          </div>
+        </div>
+        <div style="height:3px;background:var(--bg3);border-radius:2px;margin-bottom:12px;overflow:hidden;">
+          <div style="height:100%;width:${moPct.toFixed(1)}%;background:${col};border-radius:2px;"></div>
+        </div>
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">BREAK-EVEN</div>
+          ${sn.breakEven!==null
+            ?`<div style="display:flex;align-items:baseline;gap:8px;">
+                <span class="mv mv-purple" style="font-size:18px;">${sn.breakEven.toFixed(1)}<span style="font-size:11px;color:var(--text2);margin-left:2px;">mo</span></span>
+                <span style="color:rgba(255,255,255,0.1);">|</span>
+                <span class="mv mv-purple" style="font-size:18px;">${(sn.breakEven/12).toFixed(1)}<span style="font-size:11px;color:var(--text2);margin-left:2px;">yr</span></span>
+              </div>`
+            :`<span style="color:var(--orange);font-family:var(--mono);font-size:14px;">∞ unprofitable</span>`}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:8px;">
+          <span>Build cost</span><span style="font-family:var(--mono);color:var(--text);">${f$(sn.buildCost)}</span>
+        </div>
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.05);margin-bottom:7px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">${Math.round(sn.rate*100)}¢/hr &nbsp;·&nbsp; ${sn.util}% util &nbsp;·&nbsp; $${sn.kwh.toFixed(2)}/kWh</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  // ── COMPARISON BARS ──
+  const bars=`<div class="g2">
+    <div class="card">
+      <div class="card-title">Monthly Net Income</div>
+      <div class="bar-chart">${snaps.map(sn=>bar(sn.name,Math.max(0,sn.monthly),maxMo,pc(sn.buildColor||'cyan').hex,f$(sn.monthly)+'/mo')).join('')}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Months to Break-even <span style="font-size:10px;color:var(--text3);font-weight:400;">shorter is better</span></div>
+      <div class="bar-chart">${snaps.filter(s=>s.breakEven!==null).map(sn=>bar(sn.name,sn.breakEven,maxBE,'var(--purple)',sn.breakEven.toFixed(1)+' mo · '+(sn.breakEven/12).toFixed(1)+' yr')).join('')}${snaps.filter(s=>s.breakEven===null).map(sn=>`<div class="brow"><span class="blabel">${sn.name}</span><div class="btrack"></div><span class="bval" style="color:var(--orange);">∞</span></div>`).join('')}</div>
+    </div>
+  </div>`;
+
+  document.getElementById('earn-snap-cards').innerHTML=summary+cards;
+  document.getElementById('earn-be-cards').innerHTML=bars;
 }
 
 function calcAt(bid,rate){
