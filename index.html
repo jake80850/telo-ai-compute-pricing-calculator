@@ -579,7 +579,7 @@ function renderDashMetrics(){
       ? mc('Year After Break-even',f$(e.yr),'12 mo post ROI','mv-cyan')
       : `<div class="card"><div class="card-title">Year After Break-even</div><div class="mv mv-orange">Unprofitable</div><div class="metric-sub" style="line-height:1.7;">electricity cost exceeds earnings<br><span style="font-family:var(--mono);font-size:11px;color:var(--text2);">${f$(e.gross*24*360)}/yr gross<br>− ${f$(e.pcost*24*360)}/yr electricity<br><span style="color:var(--orange);">= ${f$(e.net*24*360)}/yr net</span></span></div></div>`,
     e.be!==null
-      ? mc('Break-even',e.be.toFixed(1)+' mo','months to ROI','mv-purple')
+      ? `<div class="card"><div class="card-title">Break-even</div><div style="display:flex;align-items:baseline;gap:14px;"><div class="mv mv-purple">${e.be.toFixed(1)} <span style="font-size:15px;color:var(--text2);">mo</span></div><div style="color:rgba(255,255,255,0.12);font-size:20px;font-weight:300;">|</div><div class="mv mv-purple">${(e.be/12).toFixed(1)} <span style="font-size:15px;color:var(--text2);">yr</span></div></div><hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0 6px;"><div class="metric-sub">months to ROI</div></div>`
       : mc('Break-even','Unprofitable','electricity cost exceeds earnings','mv-orange'),
     mc('Power Draw',e.kw.toFixed(2)+' kW',f$(e.pcost*24*30)+'/mo electricity','mv-orange'),
   ].join('');
