@@ -626,7 +626,16 @@ function updateAll() {
     ${metric('Net / Hour', (e.net >= 0 ? '$' : '-$') + Math.abs(e.net).toFixed(2), 'after electricity', e.net >= 0 ? 'green' : 'orange')}
     ${metric('Monthly Profit', '$' + Math.round(e.monthly).toLocaleString(), '30 day estimate', 'green')}
     ${metric('Annual Profit', '$' + Math.round(e.yearly).toLocaleString(), '365 day estimate', 'green')}
-    ${metric('Break-even', isFinite(e.breakEven) ? e.breakEven.toFixed(1) + ' mo' : '∞', 'months to ROI', 'purple')}
+    ${isFinite(e.breakEven) ? `<div class="card">
+      <div class="card-title">Break-even</div>
+      <div style="display:flex;align-items:baseline;gap:14px;">
+        <div class="metric-val purple">${e.breakEven.toFixed(1)} <span style="font-size:15px;color:var(--text2);">mo</span></div>
+        <div style="color:rgba(255,255,255,0.12);font-size:20px;font-weight:300;">|</div>
+        <div class="metric-val purple">${(e.breakEven/12).toFixed(1)} <span style="font-size:15px;color:var(--text2);">yr</span></div>
+      </div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0 6px;">
+      <div class="metric-sub">months to ROI</div>
+    </div>` : metric('Break-even', '∞', 'not profitable', 'orange')}
     ${metric('Power Draw', e.powerKW.toFixed(2) + ' kW', '$' + (e.powerCost * 24 * 30).toFixed(0) + '/mo electricity', 'orange')}
   `;
 
