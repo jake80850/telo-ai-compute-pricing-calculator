@@ -162,6 +162,10 @@ textarea::placeholder{color:var(--text3);}
 
 @media(max-width:768px){.g3{grid-template-columns:1fr;}.g2{grid-template-columns:1fr;}}
 @keyframes spin{to{transform:rotate(360deg);}}
+@keyframes earn-in-r{from{opacity:0;transform:translateX(52px)}to{opacity:1;transform:translateX(0)}}
+@keyframes earn-in-l{from{opacity:0;transform:translateX(-52px)}to{opacity:1;transform:translateX(0)}}
+.earn-anim-r{animation:earn-in-r .3s ease-out}
+.earn-anim-l{animation:earn-in-l .3s ease-out}
 </style>
 </head>
 <body>
@@ -431,22 +435,72 @@ let S=JSON.parse(JSON.stringify(DEF));
 let dashBid=S.builds[0].id;
 let partsBid=S.builds[0].id;
 let earnPage=0;
+// Context shared between renderEarnings and earnNav
+let _earnSnaps=[],_earnBestMo=null,_earnBestBE=null,_earnMaxMo=1;
+function _earnCardHtml(sn){
+  const col=pc(sn.buildColor||'cyan').hex;
+  const isBestMo=_earnBestMo&&sn.id===_earnBestMo.id;
+  const isBestBE=_earnBestBE&&sn.id===_earnBestBE.id;
+  const moPct=Math.min(100,(sn.monthly/_earnMaxMo)*100);
+  return`<div class="card" style="flex:0 0 calc(25% - 9px);border-top:2px solid ${col};padding-top:14px;box-sizing:border-box;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+      <div style="min-width:0;">
+        <div style="font-weight:600;font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sn.name}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sn.buildName} · ${sn.gpuName} ×${sn.numGpu}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;margin-left:6px;">
+        ${isBestMo?`<span style="font-size:9px;font-family:var(--mono);background:${col}22;color:${col};border:1px solid ${col}55;border-radius:3px;padding:2px 5px;white-space:nowrap;">TOP INCOME</span>`:''}
+        ${isBestBE?`<span style="font-size:9px;font-family:var(--mono);background:rgba(139,92,246,.15);color:var(--purple);border:1px solid rgba(139,92,246,.35);border-radius:3px;padding:2px 5px;white-space:nowrap;">FASTEST ROI</span>`:''}
+      </div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:2px;">MONTHLY</div>
+        <div class="mv" style="color:${col};font-size:22px;">${f$(sn.monthly)}</div>
+      </div>
+      <div style="color:rgba(255,255,255,0.1);font-size:16px;font-weight:300;padding-top:14px;">|</div>
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:2px;">YEARLY</div>
+        <div class="mv" style="color:${col};font-size:22px;">${sn.yr!==null?f$(sn.yr):'—'}</div>
+      </div>
+    </div>
+    <div style="height:3px;background:var(--bg3);border-radius:2px;margin-bottom:12px;overflow:hidden;">
+      <div style="height:100%;width:${moPct.toFixed(1)}%;background:${col};border-radius:2px;"></div>
+    </div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">BREAK-EVEN</div>
+      ${sn.breakEven!==null
+        ?`<div style="display:flex;align-items:baseline;gap:6px;">
+            <span class="mv mv-purple" style="font-size:16px;">${sn.breakEven.toFixed(1)}<span style="font-size:10px;color:var(--text2);margin-left:1px;">mo</span></span>
+            <span style="color:rgba(255,255,255,0.1);">|</span>
+            <span class="mv mv-purple" style="font-size:16px;">${(sn.breakEven/12).toFixed(1)}<span style="font-size:10px;color:var(--text2);margin-left:1px;">yr</span></span>
+          </div>`
+        :`<span style="color:var(--orange);font-family:var(--mono);font-size:12px;">∞</span>`}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:8px;">
+      <span>Build cost</span><span style="font-family:var(--mono);color:var(--text);">${f$(sn.buildCost)}</span>
+    </div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.05);margin-bottom:7px;">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">${Math.round(sn.rate*100)}¢/hr · ${sn.util}% util · $${sn.kwh.toFixed(2)}/kWh</div>
+  </div>`;
+}
 function earnNav(dir){
-  const snaps=S.snapshots||[];
-  const maxPage=Math.max(0,snaps.length-4);
-  earnPage=Math.max(0,Math.min(earnPage+dir,maxPage));
-  const wrap=document.getElementById('earn-carousel-wrap');
+  if(!_earnSnaps.length)return;
+  earnPage=((earnPage+dir)%_earnSnaps.length+_earnSnaps.length)%_earnSnaps.length;
   const track=document.getElementById('earn-track');
-  if(!wrap||!track)return;
-  const step=wrap.offsetWidth/4+3;
-  track.style.transform=`translateX(-${earnPage*step}px)`;
-  const prev=document.getElementById('earn-prev');
-  const next=document.getElementById('earn-next');
-  if(prev){prev.disabled=earnPage===0;prev.style.opacity=earnPage===0?'0.25':'1';prev.style.cursor=earnPage===0?'default':'pointer';}
-  if(next){next.disabled=earnPage>=maxPage;next.style.opacity=earnPage>=maxPage?'0.25':'1';next.style.cursor=earnPage>=maxPage?'default':'pointer';}
-  // update dots
-  const dotEls=document.querySelectorAll('.earn-dot');
-  dotEls.forEach((d,i)=>{d.style.width=i===earnPage?'16px':'6px';d.style.background=i===earnPage?'var(--cyan)':'rgba(255,255,255,0.15)';});
+  const counter=document.getElementById('earn-counter');
+  if(!track)return;
+  const visCount=Math.min(4,_earnSnaps.length);
+  const ghostCount=Math.max(0,4-_earnSnaps.length);
+  const ghostHtml=`<div style="flex:0 0 calc(25% - 9px);background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;"><div style="text-align:center;color:var(--text3);"><div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div><div style="font-size:11px;">Save snapshot</div></div></div>`;
+  const vis=Array.from({length:visCount},(_,i)=>_earnSnaps[(earnPage+i)%_earnSnaps.length]);
+  track.innerHTML=vis.map(_earnCardHtml).join('')+ghostHtml.repeat(ghostCount);
+  track.classList.remove('earn-anim-r','earn-anim-l');
+  track.offsetHeight;
+  track.classList.add(dir>=0?'earn-anim-r':'earn-anim-l');
+  if(counter)counter.textContent=`${earnPage+1} / ${_earnSnaps.length}`;
+  document.querySelectorAll('.earn-dot').forEach((d,i)=>{const a=i===earnPage;d.style.width=a?'16px':'6px';d.style.background=a?'var(--cyan)':'rgba(255,255,255,0.15)';});
 }
 let editGid=null, editPid=null, editPbid=null, renameBid=null;
 let nbColor='purple';
@@ -1002,80 +1056,30 @@ function renderEarnings(){
     </div>
   </div>`;
 
-  // ── PER-SCENARIO CARDS (sliding carousel, always 4 visible, 1 step at a time) ──
-  const maxPage=Math.max(0,snaps.length-4);
-  earnPage=Math.min(earnPage,maxPage);
-  const canScroll=snaps.length>4;
-  // pad to at least 4 total items with ghost cards
+  // ── PER-SCENARIO CARDS (infinite circular carousel, always 4 visible) ──
+  // Update shared context used by earnNav
+  earnPage=((earnPage%snaps.length)+snaps.length)%snaps.length;
+  _earnSnaps=snaps; _earnBestMo=bestMo; _earnBestBE=bestBE; _earnMaxMo=maxMo;
+
+  const visCount=Math.min(4,snaps.length);
   const ghostCount=Math.max(0,4-snaps.length);
-  const ghostCard=`<div style="flex:0 0 calc(25% - 9px);background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;">
-    <div style="text-align:center;color:var(--text3);">
-      <div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div>
-      <div style="font-size:11px;">Save snapshot</div>
-    </div>
+  const ghostHtml=`<div style="flex:0 0 calc(25% - 9px);background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;"><div style="text-align:center;color:var(--text3);"><div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div><div style="font-size:11px;">Save snapshot</div></div></div>`;
+  const vis=Array.from({length:visCount},(_,i)=>snaps[(earnPage+i)%snaps.length]);
+  const arrowBtn=id=>`<button onclick="earnNav(${id==='earn-prev'?-1:1})" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:var(--bg3);color:var(--text);font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;align-self:center;padding-bottom:2px;">${id==='earn-prev'?'&#8249;':'&#8250;'}</button>`;
+  const hasMultiple=snaps.length>1;
+  const dots=`<div style="display:flex;justify-content:center;align-items:center;gap:5px;margin-top:12px;">
+    ${snaps.map((_,i)=>`<div class="earn-dot" style="width:${i===earnPage?16:6}px;height:6px;border-radius:3px;background:${i===earnPage?'var(--cyan)':'rgba(255,255,255,0.15)'};transition:all .25s;cursor:${hasMultiple?'pointer':'default'}" onclick="if(${hasMultiple}){earnPage=${i-1};earnNav(1);}"></div>`).join('')}
+    <span id="earn-counter" style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:6px;">${earnPage+1} / ${snaps.length}</span>
   </div>`;
-  const snapCardHtml=sn=>{
-    const col=pc(sn.buildColor||'cyan').hex;
-    const isBestMo=bestMo&&sn.id===bestMo.id;
-    const isBestBE=bestBE&&sn.id===bestBE.id;
-    const moPct=Math.min(100,(sn.monthly/maxMo)*100);
-    return`<div class="card" style="flex:0 0 calc(25% - 9px);border-top:2px solid ${col};padding-top:14px;box-sizing:border-box;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div style="min-width:0;">
-          <div style="font-weight:600;font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sn.name}</div>
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sn.buildName} · ${sn.gpuName} ×${sn.numGpu}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;margin-left:6px;">
-          ${isBestMo?`<span style="font-size:9px;font-family:var(--mono);background:${col}22;color:${col};border:1px solid ${col}55;border-radius:3px;padding:2px 5px;white-space:nowrap;">TOP INCOME</span>`:''}
-          ${isBestBE?`<span style="font-size:9px;font-family:var(--mono);background:rgba(139,92,246,.15);color:var(--purple);border:1px solid rgba(139,92,246,.35);border-radius:3px;padding:2px 5px;white-space:nowrap;">FASTEST ROI</span>`:''}
-        </div>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">
-        <div>
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:2px;">MONTHLY</div>
-          <div class="mv" style="color:${col};font-size:22px;">${f$(sn.monthly)}</div>
-        </div>
-        <div style="color:rgba(255,255,255,0.1);font-size:16px;font-weight:300;padding-top:14px;">|</div>
-        <div>
-          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;margin-bottom:2px;">YEARLY</div>
-          <div class="mv" style="color:${col};font-size:22px;">${sn.yr!==null?f$(sn.yr):'—'}</div>
-        </div>
-      </div>
-      <div style="height:3px;background:var(--bg3);border-radius:2px;margin-bottom:12px;overflow:hidden;">
-        <div style="height:100%;width:${moPct.toFixed(1)}%;background:${col};border-radius:2px;"></div>
-      </div>
-      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;">BREAK-EVEN</div>
-        ${sn.breakEven!==null
-          ?`<div style="display:flex;align-items:baseline;gap:6px;">
-              <span class="mv mv-purple" style="font-size:16px;">${sn.breakEven.toFixed(1)}<span style="font-size:10px;color:var(--text2);margin-left:1px;">mo</span></span>
-              <span style="color:rgba(255,255,255,0.1);">|</span>
-              <span class="mv mv-purple" style="font-size:16px;">${(sn.breakEven/12).toFixed(1)}<span style="font-size:10px;color:var(--text2);margin-left:1px;">yr</span></span>
-            </div>`
-          :`<span style="color:var(--orange);font-family:var(--mono);font-size:12px;">∞</span>`}
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:8px;">
-        <span>Build cost</span><span style="font-family:var(--mono);color:var(--text);">${f$(sn.buildCost)}</span>
-      </div>
-      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.05);margin-bottom:7px;">
-      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">${Math.round(sn.rate*100)}¢/hr · ${sn.util}% util · $${sn.kwh.toFixed(2)}/kWh</div>
-    </div>`;
-  };
-  const arrowBtn=(id,disabled)=>`<button id="${id}" onclick="earnNav(${id==='earn-prev'?-1:1})" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,${disabled?'.06':'.22'});background:${disabled?'transparent':'var(--bg3)'};color:var(--text);font-size:26px;cursor:${disabled?'default':'pointer'};display:flex;align-items:center;justify-content:center;transition:all .2s;opacity:${disabled?'.3':'1'};align-self:center;padding-bottom:2px;">${id==='earn-prev'?'&#8249;':'&#8250;'}</button>`;
-  const dots=canScroll?`<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:12px;">
-    ${Array.from({length:maxPage+1},(_,i)=>`<div class="earn-dot" style="width:${i===earnPage?16:6}px;height:6px;border-radius:3px;background:${i===earnPage?'var(--cyan)':'rgba(255,255,255,0.15)'};transition:all .25s;"></div>`).join('')}
-    <span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:6px;">${earnPage+1} / ${maxPage+1}</span>
-  </div>`:'';
   const cards=`<div style="margin-bottom:22px;">
     <div style="display:flex;align-items:stretch;gap:10px;">
-      ${canScroll?arrowBtn('earn-prev',earnPage===0):''}
-      <div id="earn-carousel-wrap" style="flex:1;overflow:hidden;min-width:0;">
-        <div id="earn-track" style="display:flex;gap:12px;transition:transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94);will-change:transform;">
-          ${snaps.map(snapCardHtml).join('')}${Array(ghostCount).fill(ghostCard).join('')}
+      ${hasMultiple?arrowBtn('earn-prev'):''}
+      <div style="flex:1;min-width:0;">
+        <div id="earn-track" style="display:flex;gap:12px;">
+          ${vis.map(_earnCardHtml).join('')}${ghostHtml.repeat(ghostCount)}
         </div>
       </div>
-      ${canScroll?arrowBtn('earn-next',earnPage>=maxPage):''}
+      ${hasMultiple?arrowBtn('earn-next'):''}
     </div>
     ${dots}
   </div>`;
@@ -1094,19 +1098,6 @@ function renderEarnings(){
 
   document.getElementById('earn-snap-cards').innerHTML=summary+cards;
   document.getElementById('earn-be-cards').innerHTML=bars;
-  // Restore carousel scroll position after DOM rebuild
-  if(earnPage>0){
-    requestAnimationFrame(()=>{
-      const wrap=document.getElementById('earn-carousel-wrap');
-      const track=document.getElementById('earn-track');
-      if(wrap&&track){
-        const step=wrap.offsetWidth/4+3;
-        track.style.transition='none';
-        track.style.transform=`translateX(-${earnPage*step}px)`;
-        requestAnimationFrame(()=>{if(track)track.style.transition='transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)';});
-      }
-    });
-  }
 
   // ── RECOMMENDATION ──
   // Score each snapshot: 40% monthly income, 40% ROI speed, 20% capital efficiency
