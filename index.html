@@ -238,21 +238,8 @@ textarea::placeholder{color:var(--text3);}
 
   <!-- EARNINGS -->
   <div class="panel" id="tab-earnings">
-    <div class="g3" id="earn-metrics"></div>
-    <div class="g2">
-      <div class="card"><div class="card-title">Monthly Profit by Rate — All Builds</div><div class="bar-chart" id="rate-chart"></div></div>
-      <div class="card"><div class="card-title">Break-even Analysis</div><div id="be-detail"></div></div>
-    </div>
-    <div class="card" style="margin-top:16px;">
-      <div class="card-title">Vast.ai Notes</div>
-      <p style="font-size:13px;color:var(--text2);line-height:1.9;">
-        Vast.ai charges an <strong style="color:var(--text)">~8% platform fee</strong> already factored into all calculations.
-        Requires a reliable <strong style="color:var(--text)">1Gbps+ connection</strong> — ideally 10GbE.
-        Run <strong style="color:var(--text)">Ubuntu 22.04</strong> with their Docker setup.
-        The <strong style="color:var(--text)">32GB+ VRAM</strong> threshold unlocks 70B+ LLM workloads at premium rates.
-        New machines take a few weeks to build rental history before hitting full utilization.
-      </p>
-    </div>
+    <div id="earn-snap-cards"></div>
+    <div id="earn-be-cards" style="margin-top:20px;"></div>
   </div>
 
   <!-- SNAPSHOTS -->
@@ -958,35 +945,58 @@ function cm2(label,va,vb,nameA,nameB,winCol,loseCol,hint){
 // EARNINGS
 // ─────────────────────────────────────────────────────────────────────────────
 function renderEarnings(){
-  const calcs=S.builds.map(b=>({b,e:calc(b.id)}));
-  document.getElementById('earn-metrics').innerHTML=calcs.slice(0,3).map(({b,e})=>{
-    const col=pc(b.color).hex;
-    return`<div class="card"><div class="card-title">${b.name}</div><div class="mv" style="color:${col};">${f$(e.net,2)}/hr</div><div class="metric-sub">${f$(e.mo)}/mo · ${isFinite(e.be)?e.be.toFixed(1)+' mo BE':'∞ BE'}</div></div>`;
-  }).join('');
+  const snaps=S.snapshots||[];
+  const empty=`<div style="text-align:center;padding:60px 20px;color:var(--text3);">
+    <div style="font-size:28px;opacity:.3;margin-bottom:10px;">⬡</div>
+    <div style="font-size:14px;color:var(--text2);margin-bottom:4px;">No snapshots yet</div>
+    <div style="font-size:12px;">Save a snapshot on the Snapshots tab to see earnings analysis here.</div>
+  </div>`;
+  if(!snaps.length){
+    document.getElementById('earn-snap-cards').innerHTML=empty;
+    document.getElementById('earn-be-cards').innerHTML='';
+    return;
+  }
 
-  const rates=[0.50,0.75,1.00,1.25,1.50,1.75,2.00,2.50,3.00];
-  const mxM=Math.max(...rates.flatMap(r=>calcs.map(({b,e})=>calcAt(b.id,r))),1);
-  document.getElementById('rate-chart').innerHTML=rates.map(r=>{
-    return`<div style="margin-bottom:7px;">
-      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:3px;">$${r.toFixed(2)}/hr</div>
-      ${calcs.map(({b})=>bar(b.name,Math.max(0,calcAt(b.id,r)),mxM,pc(b.color).hex,f$(calcAt(b.id,r)))).join('')}
+  // Income cards — monthly + yearly side by side
+  document.getElementById('earn-snap-cards').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;">
+      ${snaps.map(sn=>{
+        const col=pc(sn.buildColor||'cyan').hex;
+        return`<div class="card">
+          <div class="card-title">${sn.name}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">${sn.buildName} · ${sn.gpuName} ×${sn.numGpu}</div>
+          <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:4px;">
+            <div><div class="mv" style="color:${col};">${f$(sn.monthly)}<span style="font-size:13px;color:var(--text3);margin-left:3px;">/mo</span></div></div>
+            <div style="color:rgba(255,255,255,0.12);font-size:20px;font-weight:300;">|</div>
+            <div><div class="mv" style="color:${col};">${sn.yr!==null?f$(sn.yr):'—'}<span style="font-size:13px;color:var(--text3);margin-left:3px;">/yr</span></div></div>
+          </div>
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0;">
+          <div style="font-size:12px;color:var(--text2);">${Math.round(sn.rate*100)}¢/hr · ${sn.util}% util · $${sn.kwh.toFixed(2)}/kWh</div>
+        </div>`;
+      }).join('')}
     </div>`;
-  }).join('');
 
-  document.getElementById('be-detail').innerHTML=calcs.map(({b,e})=>{
-    const col=pc(b.color).hex;
-    return isFinite(e.be)?`
-      <div style="margin-bottom:14px;">
-        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">${b.name}</div>
-        <div class="mv" style="font-size:22px;color:${col};">${e.be.toFixed(1)} mo</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.9;margin-top:5px;">
-          Monthly net: <span style="color:var(--text);">${f$(e.mo)}</span> &nbsp;·&nbsp;
-          Yr1: <span style="${e.mo*12>e.cost?`color:${col}`:'color:var(--orange)'};">${f$(e.mo*12-e.cost)}</span> &nbsp;·&nbsp;
-          Yr2: <span style="color:${col};">${f$(e.mo*24-e.cost)}</span>
-        </div>
-      </div><hr style="border:none;border-top:1px solid var(--border);margin:10px 0;">`:
-    `<div style="margin-bottom:14px;"><div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">${b.name}</div><div class="mv mv-orange">∞</div><div class="metric-sub">Not profitable at current settings.</div></div><hr style="border:none;border-top:1px solid var(--border);margin:10px 0;">`;
-  }).join('');
+  // Break-even cards
+  document.getElementById('earn-be-cards').innerHTML=`
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">Break-even Analysis</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
+      ${snaps.map(sn=>{
+        return sn.breakEven!==null?`<div class="card">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">${sn.name}</div>
+          <div style="display:flex;align-items:baseline;gap:14px;">
+            <div class="mv mv-purple">${sn.breakEven.toFixed(1)}<span style="font-size:15px;color:var(--text2);margin-left:3px;">mo</span></div>
+            <div style="color:rgba(255,255,255,0.12);font-size:20px;font-weight:300;">|</div>
+            <div class="mv mv-purple">${(sn.breakEven/12).toFixed(1)}<span style="font-size:15px;color:var(--text2);margin-left:3px;">yr</span></div>
+          </div>
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0 6px;">
+          <div class="metric-sub">to recover ${f$(sn.buildCost)}</div>
+        </div>`:`<div class="card">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">${sn.name}</div>
+          <div class="mv mv-orange">∞</div>
+          <div class="metric-sub">not profitable at this rate</div>
+        </div>`;
+      }).join('')}
+    </div>`;
 }
 
 function calcAt(bid,rate){
