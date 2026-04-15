@@ -431,7 +431,23 @@ let S=JSON.parse(JSON.stringify(DEF));
 let dashBid=S.builds[0].id;
 let partsBid=S.builds[0].id;
 let earnPage=0;
-function earnNav(dir){earnPage=Math.max(0,earnPage+dir);renderEarnings();}
+function earnNav(dir){
+  const snaps=S.snapshots||[];
+  const maxPage=Math.max(0,snaps.length-4);
+  earnPage=Math.max(0,Math.min(earnPage+dir,maxPage));
+  const wrap=document.getElementById('earn-carousel-wrap');
+  const track=document.getElementById('earn-track');
+  if(!wrap||!track)return;
+  const step=wrap.offsetWidth/4+3;
+  track.style.transform=`translateX(-${earnPage*step}px)`;
+  const prev=document.getElementById('earn-prev');
+  const next=document.getElementById('earn-next');
+  if(prev){prev.disabled=earnPage===0;prev.style.opacity=earnPage===0?'0.25':'1';prev.style.cursor=earnPage===0?'default':'pointer';}
+  if(next){next.disabled=earnPage>=maxPage;next.style.opacity=earnPage>=maxPage?'0.25':'1';next.style.cursor=earnPage>=maxPage?'default':'pointer';}
+  // update dots
+  const dotEls=document.querySelectorAll('.earn-dot');
+  dotEls.forEach((d,i)=>{d.style.width=i===earnPage?'16px':'6px';d.style.background=i===earnPage?'var(--cyan)':'rgba(255,255,255,0.15)';});
+}
 let editGid=null, editPid=null, editPbid=null, renameBid=null;
 let nbColor='purple';
 
@@ -986,17 +1002,23 @@ function renderEarnings(){
     </div>
   </div>`;
 
-  // ── PER-SCENARIO CARDS (carousel, 4 per page) ──
-  const PAGE=4;
-  const totalPages=Math.ceil(snaps.length/PAGE);
-  earnPage=Math.min(earnPage,totalPages-1);
-  const pageSnaps=snaps.slice(earnPage*PAGE,(earnPage+1)*PAGE);
-  function snapCard(sn){
+  // ── PER-SCENARIO CARDS (sliding carousel, always 4 visible, 1 step at a time) ──
+  const maxPage=Math.max(0,snaps.length-4);
+  earnPage=Math.min(earnPage,maxPage);
+  // pad to at least 4 total items with ghost cards
+  const ghostCount=Math.max(0,4-snaps.length);
+  const ghostCard=`<div style="flex:0 0 calc(25% - 9px);background:var(--bg2);border:1px dashed rgba(255,255,255,0.08);border-radius:var(--r2);display:flex;align-items:center;justify-content:center;min-height:220px;opacity:0.4;">
+    <div style="text-align:center;color:var(--text3);">
+      <div style="font-size:22px;margin-bottom:6px;opacity:.5;">+</div>
+      <div style="font-size:11px;">Save snapshot</div>
+    </div>
+  </div>`;
+  const snapCardHtml=sn=>{
     const col=pc(sn.buildColor||'cyan').hex;
     const isBestMo=bestMo&&sn.id===bestMo.id;
     const isBestBE=bestBE&&sn.id===bestBE.id;
     const moPct=Math.min(100,(sn.monthly/maxMo)*100);
-    return`<div class="card" style="border-top:2px solid ${col};padding-top:14px;position:relative;min-width:0;">
+    return`<div class="card" style="flex:0 0 calc(25% - 9px);border-top:2px solid ${col};padding-top:14px;box-sizing:border-box;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
         <div style="min-width:0;">
           <div style="font-weight:600;font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sn.name}</div>
@@ -1038,18 +1060,23 @@ function renderEarnings(){
       <hr style="border:none;border-top:1px solid rgba(255,255,255,0.05);margin-bottom:7px;">
       <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">${Math.round(sn.rate*100)}¢/hr · ${sn.util}% util · $${sn.kwh.toFixed(2)}/kWh</div>
     </div>`;
-  }
-  const arrowBtn=(dir,disabled)=>`<button onclick="earnNav(${dir})" style="flex-shrink:0;width:34px;height:34px;border-radius:50%;border:1px solid ${disabled?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.2)'};background:${disabled?'transparent':'var(--bg3)'};color:${disabled?'var(--text3)':'var(--text)'};font-size:18px;cursor:${disabled?'default':'pointer'};display:flex;align-items:center;justify-content:center;transition:all .15s;">${dir===-1?'&#8249;':'&#8250;'}</button>`;
-  const dots=totalPages>1?`<div style="display:flex;gap:5px;align-items:center;">${Array.from({length:totalPages},(_,i)=>`<div style="width:${i===earnPage?16:6}px;height:6px;border-radius:3px;background:${i===earnPage?'var(--cyan)':'rgba(255,255,255,0.15)'};transition:all .2s;"></div>`).join('')}</div>`:'';
+  };
+  const arrowStyle=(id,disabled)=>`id="${id}" onclick="earnNav(${id==='earn-prev'?-1:1})" style="flex-shrink:0;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,${disabled?.06:.18});background:${disabled?'transparent':'var(--bg3)'};color:var(--text);font-size:22px;cursor:${disabled?'default':'pointer'};display:flex;align-items:center;justify-content:center;transition:all .2s;opacity:${disabled?.25:1};align-self:center;"`;
+  const dots=maxPage>0?`<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:12px;">
+    ${Array.from({length:maxPage+1},(_,i)=>`<div class="earn-dot" style="width:${i===earnPage?16:6}px;height:6px;border-radius:3px;background:${i===earnPage?'var(--cyan)':'rgba(255,255,255,0.15)'};transition:all .25s;"></div>`).join('')}
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:6px;">${earnPage+1} / ${maxPage+1}</span>
+  </div>`:'';
   const cards=`<div style="margin-bottom:22px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      ${arrowBtn(-1,earnPage===0)}
-      <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;min-width:0;">
-        ${pageSnaps.map(snapCard).join('')}
+    <div style="display:flex;align-items:stretch;gap:10px;">
+      <button ${arrowStyle('earn-prev',earnPage===0)}>&#8249;</button>
+      <div id="earn-carousel-wrap" style="flex:1;overflow:hidden;min-width:0;">
+        <div id="earn-track" style="display:flex;gap:12px;transition:transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94);will-change:transform;">
+          ${snaps.map(snapCardHtml).join('')}${Array(ghostCount).fill(ghostCard).join('')}
+        </div>
       </div>
-      ${arrowBtn(1,earnPage>=totalPages-1)}
+      <button ${arrowStyle('earn-next',earnPage>=maxPage)}>&#8250;</button>
     </div>
-    ${totalPages>1?`<div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:12px;">${dots}<span style="font-family:var(--mono);font-size:10px;color:var(--text3);">${earnPage+1} / ${totalPages}</span></div>`:''}
+    ${dots}
   </div>`;
 
   // ── COMPARISON BARS ──
